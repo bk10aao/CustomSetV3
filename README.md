@@ -78,9 +78,9 @@ All methods implemented are identical to those found in the Java [Set](https://d
 | **`addAll(Collection)`**      | 120156   | 264353   |            **V3**            | 2.20×  |
 | **`clear()`**                 | 13478    | 14886    | **Statistically Equivalent** | 1.10×  |
 | **`clone()`**                 | 126077   | 227001   |            **V3**            | 1.80×  |
-| **`constructor()`**           | 40       | 49       | **Statistically Equivalent** | 1.23×  |
+| **`constructor()`**           | 40       | 49       |            **V3**            | 1.23×  |
 | **`constructor(Collection)`** | 97922    | 198857   |            **V3**            | 2.03×  |
-| **`contains(Object)`**        | 38       | 65       | **Statistically Equivalent** | 1.71×  |
+| **`contains(Object)`**        | 38       | 65       |            **V3**            | 1.71×  |
 | **`containsAll(Collection)`** | 4665     | 15827    |            **V3**            | 3.39×  |
 | **`equals(Object)`**          | 232301   | 693256   |            **V3**            | 2.98×  |
 | **`hashCode()`**              | 49512    | 140641   |            **V3**            | 2.84×  |
@@ -89,9 +89,9 @@ All methods implemented are identical to those found in the Java [Set](https://d
 | **`remove(Object)`**          | 39       | 117      |            **V3**            | 3.00×  |
 | **`removeAll(Collection)`**   | 16968    | 39977    |            **V3**            | 2.36×  |
 | **`retainAll(Collection)`**   | 89488828 | 93672223 | **Statistically Equivalent** | 1.05×  |
-| **`size()`**                  | 34       | 40       | **Statistically Equivalent** | 1.18×  |
+| **`size()`**                  | 34       | 40       |            **V3**            | 1.18×  |
 | **`toArray()`**               | 54858    | 61205    | **Statistically Equivalent** | 1.12×  |
-| **`toArray(T[])`**            | 61537    | 86786    |       **CustomSet V3**       | 1.41×  |
+| **`toArray(T[])`**            | 61537    | 86786    |            **V3**            | 1.41×  |
 | **`toString()`**              | 475179   | 482031   | **Statistically Equivalent** | 1.01×  |
 
 ### V3 vs V2
