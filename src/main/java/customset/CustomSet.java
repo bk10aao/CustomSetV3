@@ -1,4 +1,4 @@
-package customstack;
+package customset;
 
 import java.util.Arrays;
 import java.util.Collection;

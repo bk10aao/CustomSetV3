@@ -1,5 +1,4 @@
-package customstack;
-
+package customset;
 
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.results.RunResult;
@@ -174,7 +173,7 @@ public class CustomSetV3Benchmark {
         Options opt = new OptionsBuilder()
                 .include(CustomSetV3Benchmark.class.getSimpleName())
                 .forks(1)
-                .result("custom-set-v1-results.csv")
+                .result("custom-set-v3-results.csv")
                 .resultFormat(ResultFormatType.CSV)
                 .build();
 
