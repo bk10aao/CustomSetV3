@@ -130,6 +130,14 @@ All methods implemented are identical to those found in the Java [Set](https://d
 ![Geometric](PerformanceTesting/V3_JDK/geometric.png)
 ![Geometric](PerformanceTesting/V2_V3/geometric.png)
 
+## Grouped Graphs 
+### V3 vs JDK
+![Combined Performance Charts](PerformanceTesting/V3_JDK/grid.png)
+
+### V3 vs V2
+![Combined Performance Charts](PerformanceTesting/V2_V3/grid.png)
+
+## Individual Graphs
 ### V1 vs V2 vs V3 vs JDK Performance
 ![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/constructor.png)
 ![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/constructorCollection.png)
