@@ -70,7 +70,7 @@ sns.heatmap(df_heatmap,
             annot_kws={'size': 9, 'weight': 'bold'})
 
 # 5. Styling
-ax.set_title('CustomSet V3 vs CustomSet V2 Performance Speedup Matrix', color='#ffffff', fontsize=16, fontweight='bold', pad=20)
+ax.set_title('V3 vs V2 Performance Speedup Matrix', color='#ffffff', fontsize=16, fontweight='bold', pad=20)
 ax.set_ylabel('Set Interface Methods', color='#aaaaaa', fontsize=13, labelpad=10)
 ax.set_xlabel('Collection Size (Elements)', color='#aaaaaa', fontsize=13, labelpad=10)
 
