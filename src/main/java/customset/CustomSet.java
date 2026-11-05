@@ -32,7 +32,6 @@ import static java.util.Objects.requireNonNullElseGet;
  * @param <E> the type of elements maintained by this set
  * @see java.util.Set
  * @see java.util.HashSet
- *
  * @author Benjamin Kane
  * LinkedIn - <a href="https://www.linkedin.com/in/benjamin-kane-81149482/"/>
  * GitHub account bk10aao - <a href="https://github.com/bk10aao"/>
@@ -97,6 +96,8 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
 
     /**
      * Constructs a new set containing the elements of the specified collection.
+     * The set is created with an initial capacity sufficient to hold all elements
+     * in the specified collection without requiring a resize operation.
      *
      * @param c the collection whose elements are to be placed into this set
      * @throws NullPointerException if the specified collection is null
@@ -892,8 +893,9 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
 
         /**
          * Ensures that the given root node of a red-black tree bin is placed at the front
-         * of the bucket's collision chain in the table.16 * @param tab  the hash table array
+         * of the bucket's collision chain in the table.
          *
+         * @param tab  the hash table array
          * @param root the root node of the tree
          */
         private static <E> void moveRootToFront(final Node<E>[] tab, final TreeNode<E> root) {
