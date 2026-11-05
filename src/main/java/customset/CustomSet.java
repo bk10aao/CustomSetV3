@@ -1,6 +1,7 @@
 package customset;
 
 import java.util.Collection;
+import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Objects;
@@ -36,6 +37,9 @@ import static java.util.Objects.requireNonNullElseGet;
  * Repository - <a href="https://github.com/bk10aao/CustomSetV3"/>
  */
 public class CustomSet<E> implements Set<E>, Cloneable {
+    private boolean CONTAINS_NULL = false;
+
+    private final float loadFactor;
 
     private int size;
     private int threshold;
@@ -43,10 +47,12 @@ public class CustomSet<E> implements Set<E>, Cloneable {
     private Node<E>[] table;
 
     private static final int MAXIMUM_CAPACITY = 1_073_741_824;
+    private static final int MIN_TREEIFY_CAPACITY = 64;
     private static final int TREEIFY_THRESHOLD   = 8;
     private static final int UNTREEIFY_THRESHOLD = 6;
-
     private static final float DEFAULT_LOAD_FACTOR = 0.75f;
+
+    private transient int modCount = 0;
 
     /**
      * Constructs a new, empty set with an initial capacity of 16 and a default load factor of 0.75.
@@ -62,12 +68,7 @@ public class CustomSet<E> implements Set<E>, Cloneable {
      * @throws IllegalArgumentException if the initial capacity is negative
      */
     public CustomSet(final int initialCapacity) {
-        if (initialCapacity < 0)
-            throw new IllegalArgumentException("Initial capacity must not be negative: " + initialCapacity);
-        int capacity = tableSizeFor(initialCapacity);
-        this.table = (Node<E>[]) new Node[capacity];
-        this.size = 0;
-        this.threshold = (int) (capacity * DEFAULT_LOAD_FACTOR);
+        this(initialCapacity, DEFAULT_LOAD_FACTOR);
     }
 
     /**
@@ -83,7 +84,8 @@ public class CustomSet<E> implements Set<E>, Cloneable {
         int capacity = tableSizeFor(initialCapacity);
         this.table = (Node<E>[]) new Node[capacity];
         this.size = 0;
-        this.threshold = (int) (capacity * DEFAULT_LOAD_FACTOR);
+        this.loadFactor = loadFactor;
+        this.threshold = (int) (capacity * loadFactor);
     }
 
     /**
@@ -93,13 +95,8 @@ public class CustomSet<E> implements Set<E>, Cloneable {
      * @throws NullPointerException if the specified collection is null
      */
     public CustomSet(final Collection<E> c) {
-        requireNonNull(c);
-        int capacity = tableSizeFor(c.size());
-        this.table = (Node<E>[]) new Node[capacity];
-        this.size = 0;
-        this.threshold = (int) (capacity * DEFAULT_LOAD_FACTOR);
-        for(E e : c)
-            add(e);
+        this(Math.max((int) (c.size() / DEFAULT_LOAD_FACTOR) + 1, 16), DEFAULT_LOAD_FACTOR);
+        addAll(c);
     }
 
     /**
@@ -108,10 +105,16 @@ public class CustomSet<E> implements Set<E>, Cloneable {
      *
      * @param e element to be added to this set
      * @return {@code true} if this set did not already contain the specified element
-     * @throws NullPointerException if the specified element is null
      */
     public boolean add(final E e) {
-        requireNonNull(e, "Element must not be null.");
+        if (e == null) {
+            if (CONTAINS_NULL)
+                return false;
+            CONTAINS_NULL = true;
+            size++;
+            modCount++;
+            return true;
+        }
         Node<E>[] tab = table;
         if (tab == null || tab.length == 0)
             tab = expand();
@@ -127,6 +130,7 @@ public class CustomSet<E> implements Set<E>, Cloneable {
                 if (existing != null)
                     return false;
                 size++;
+                modCount++;
                 if (size > threshold)
                     expand();
                 return true;
@@ -134,12 +138,12 @@ public class CustomSet<E> implements Set<E>, Cloneable {
             Node<E> current = first;
             int binCount = 0;
             while (true) {
-                if(current.hash == hash && (current.key == e || current.key.equals(e)))
+                if (current.hash == hash && (current.key == e || current.key.equals(e)))
                     return false;
                 Node<E> nextNode = current.next;
-                if(nextNode == null) {
+                if (nextNode == null) {
                     current.next = new Node<>(hash, e, null);
-                    if(binCount >= TREEIFY_THRESHOLD)
+                    if (binCount >= TREEIFY_THRESHOLD)
                         treeifyBin(tab, index);
                     break;
                 }
@@ -150,6 +154,7 @@ public class CustomSet<E> implements Set<E>, Cloneable {
         size++;
         if (size > threshold)
             expand();
+        modCount++;
         return true;
     }
 
@@ -161,7 +166,7 @@ public class CustomSet<E> implements Set<E>, Cloneable {
      * @throws NullPointerException if the specified collection is null
      */
     public boolean addAll(final Collection<? extends E> c) {
-        requireNonNull(c);
+        requireNonNull(c, "Collection must not be null.");
         if (c.isEmpty())
             return false;
         int initialSize = size;
@@ -191,10 +196,10 @@ public class CustomSet<E> implements Set<E>, Cloneable {
      *
      * @param o element whose presence in this set is to be tested
      * @return {@code true} if this set contains the specified element
-     * @throws NullPointerException if the specified element is null
      */
     public boolean contains(final Object o) {
-        requireNonNull(o, "Value must not be null.");
+        if (o == null)
+            return CONTAINS_NULL;
         Node<E>[] tab = table;
         if (tab == null || tab.length == 0)
             return false;
@@ -206,7 +211,7 @@ public class CustomSet<E> implements Set<E>, Cloneable {
         if (first instanceof TreeNode)
             return ((TreeNode<E>) first).getTreeNode(hash, o) != null;
         for (Node<E> node = first; node != null; node = node.next)
-            if (node.key.equals(o))
+            if (node.hash == hash && (node.key == o || node.key.equals(o)))
                 return true;
         return false;
     }
@@ -216,9 +221,11 @@ public class CustomSet<E> implements Set<E>, Cloneable {
      */
     public void clear() {
         Node<E>[] tab = table;
+        CONTAINS_NULL = false;
         if (tab != null && size > 0) {
             size = 0;
             fill(tab, null);
+            modCount++;
         }
     }
 
@@ -249,9 +256,9 @@ public class CustomSet<E> implements Set<E>, Cloneable {
      */
     @Override
     public boolean equals(final Object o) {
-        if(o == this)
+        if (o == this)
             return true;
-        if(!(o instanceof Set<?> other) || other.size() != size())
+        if (!(o instanceof Set<?> other) || other.size() != size())
             return false;
         return containsAll(other);
     }
@@ -301,8 +308,16 @@ public class CustomSet<E> implements Set<E>, Cloneable {
      * @return {@code true} if this set contained the specified element
      */
     public boolean remove(final Object o) {
-        if (o == null)
-            return false;
+        if (o == null) {
+            boolean modified = false;
+            if (CONTAINS_NULL) {
+                CONTAINS_NULL = false;
+                modified = true;
+                modCount++;
+                size--;
+            }
+            return modified;
+        }
         Node<E>[] tab = table;
         if (tab == null || tab.length == 0)
             return false;
@@ -316,6 +331,7 @@ public class CustomSet<E> implements Set<E>, Cloneable {
             if (node != null) {
                 node.removeTreeNode(tab);
                 size--;
+                modCount++;
                 return true;
             }
             return false;
@@ -325,6 +341,7 @@ public class CustomSet<E> implements Set<E>, Cloneable {
         while (current != null) {
             if (current.hash == hash && (current.key == o || current.key.equals(o))) {
                 removeNode(previous, index, current);
+                modCount++;
                 return true;
             }
             previous = current;
@@ -345,16 +362,16 @@ public class CustomSet<E> implements Set<E>, Cloneable {
         if (c.isEmpty() || size == 0)
             return false;
         boolean modified = false;
-        if (size > c.size())
+        if (size > c.size()) {
             for (Object e : c)
                 if (remove(e))
                     modified = true;
-        else {
+        } else {
             Iterator<E> it = iterator();
             while (it.hasNext()) {
                 E element = it.next();
                 if (c.contains(element)) {
-                    remove(element);
+                    it.remove();
                     modified = true;
                 }
             }
@@ -370,14 +387,14 @@ public class CustomSet<E> implements Set<E>, Cloneable {
      * @throws NullPointerException if the specified collection is null
      */
     public boolean retainAll(final Collection<?> c) {
-        requireNonNull(c);
-        if(size == 0)
+        requireNonNull(c, "Collection must not be null");
+        if (size == 0)
             return false;
         boolean modified = false;
         Iterator<E> it = iterator();
         while (it.hasNext()) {
             E element = it.next();
-            if(!c.contains(element)) {
+            if (!c.contains(element)) {
                 it.remove();
                 modified = true;
             }
@@ -404,6 +421,8 @@ public class CustomSet<E> implements Set<E>, Cloneable {
         if (table == null || size == 0)
             return arr;
         int index = 0;
+        if (CONTAINS_NULL)
+            arr[index++] = null;
         for (Node<E> node : table)
             while (node != null) {
                 arr[index++] = node.key;
@@ -423,17 +442,19 @@ public class CustomSet<E> implements Set<E>, Cloneable {
      */
     public <T> T[] toArray(final T[] a) {
         requireNonNull(a);
-        T[] arrayToFill = a.length < size ? (T[]) newInstance(a.getClass().getComponentType(), size) : a;
+        T[] arr = a.length < size ? (T[]) newInstance(a.getClass().getComponentType(), size) : a;
         int index = 0;
+        if (CONTAINS_NULL)
+            arr[index++] = null;
         if (table != null && size > 0)
             for (Node<E> node : table)
                 while (node != null) {
-                    arrayToFill[index++] = (T) node.key;
+                    arr[index++] = (T) node.key;
                     node = node.next;
                 }
         if (a.length > size)
-            arrayToFill[size] = null;
-        return arrayToFill;
+            arr[size] = null;
+        return arr;
     }
 
     /**
@@ -444,11 +465,15 @@ public class CustomSet<E> implements Set<E>, Cloneable {
      */
     @Override
     public String toString() {
-        if(size == 0)
+        if (size == 0)
             return "{}";
         StringBuilder sb = new StringBuilder("{");
         boolean first = true;
-        for(Node<E> node : table)
+        if (CONTAINS_NULL) {
+            sb.append("null");
+            first = false;
+        }
+        for (Node<E> node : table)
             while (node != null) {
                 if (!first)
                     sb.append(", ");
@@ -465,17 +490,16 @@ public class CustomSet<E> implements Set<E>, Cloneable {
         int newCap;
         if (oldCap == 0) {
             newCap = 16;
-            threshold = (int) (newCap * DEFAULT_LOAD_FACTOR);
+            threshold = (int) (newCap * loadFactor);
             table = (Node<E>[]) new Node[newCap];
             return table;
         }
-
         if (oldCap >= MAXIMUM_CAPACITY) {
             threshold = Integer.MAX_VALUE;
             return oldTab;
         }
         newCap = oldCap << 1;
-        threshold = (int) (newCap * DEFAULT_LOAD_FACTOR);
+        threshold = (int) (newCap * loadFactor);
         Node<E>[] newTab = (Node<E>[]) new Node[newCap];
         table = newTab;
         for (int j = 0; j < oldCap; ++j) {
@@ -506,7 +530,6 @@ public class CustomSet<E> implements Set<E>, Cloneable {
                             hiTail = e;
                         }
                     } while ((e = next) != null);
-
                     if (loTail != null) {
                         loTail.next = null;
                         newTab[j] = loHead;
@@ -541,6 +564,10 @@ public class CustomSet<E> implements Set<E>, Cloneable {
     }
 
     private void treeifyBin(final Node<E>[] tab, final int index) {
+        if (tab == null || tab.length < MIN_TREEIFY_CAPACITY) {
+            expand();
+            return;
+        }
         Node<E> e = tab[index];
         if (e != null) {
             TreeNode<E> hd = null, tl = null;
@@ -550,7 +577,7 @@ public class CustomSet<E> implements Set<E>, Cloneable {
                     hd = p;
                 else {
                     p.previous = tl;
-                    tl.right = p;
+                    tl.next = p;
                 }
                 tl = p;
             } while ((e = e.next) != null);
@@ -563,36 +590,62 @@ public class CustomSet<E> implements Set<E>, Cloneable {
         private Node<E> current;
         private Node<E> next;
         private int index;
+        private boolean includeNull;
+        private boolean removeNull;
+        private int expectedModCount;
 
         private HashIterator() {
+            expectedModCount = modCount;
             current = next = null;
             index = 0;
+            includeNull = CONTAINS_NULL;
             Node<E>[] tab = table;
-            if(tab != null && size > 0)
+            if (tab != null && size > 0)
                 if (index < tab.length && (next = tab[index++]) == null)
                     while (index < tab.length && (next = tab[index++]) == null) { }
         }
 
         public boolean hasNext() {
+            checkForComodification();
             return next != null;
         }
 
         public E next() {
+            checkForComodification();
+            if (includeNull) {
+                includeNull = false;
+                removeNull = true;
+                current = null;
+                return null;
+            }
             Node<E>[] tab = table;
             Node<E> e = next;
-            if(e == null)
+            if (e == null)
                 throw new NoSuchElementException();
-            if((next = (current = e).next) == null && tab != null)
+            if ((next = (current = e).next) == null && tab != null)
                 while (index < tab.length && (next = tab[index++]) == null) { }
             return e.key;
         }
 
         public void remove() {
-            if(current == null)
+            checkForComodification();
+            if (removeNull) {
+                CustomSet.this.remove(null);
+                removeNull = false;
+                expectedModCount = modCount;
+                return;
+            }
+            if (current == null)
                 throw new IllegalArgumentException();
             Object keyToRemove = current.key;
             current = null;
             CustomSet.this.remove(keyToRemove);
+            expectedModCount = modCount;
+        }
+
+        private void checkForComodification() {
+            if (modCount != expectedModCount)
+                throw new ConcurrentModificationException();
         }
     }
 
@@ -960,7 +1013,7 @@ public class CustomSet<E> implements Set<E>, Cloneable {
                     pp.left = s;
                 else
                     pp.right = s;
-                replacement = sr;
+                replacement = (sr != null) ? sr : s;
             } else
                 replacement = requireNonNullElseGet(pl, () -> requireNonNullElse(pr, p));
             if (replacement != p) {

@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class CustomSetTest {
+public class CustomSetTest {
 
     @Test
     public void onCreatingSetWitNegativeSize_and_loadFactorOf_50_throws_IllegalArgumentException() {
@@ -96,11 +96,41 @@ class CustomSetTest {
     }
 
     @Test
+    public void onAddingToSet_null_returns_true_and_sizeOf_1() {
+        CustomSet<Integer> customSet = new CustomSet<>();
+        assertTrue(customSet.add(null));
+        assertEquals(1, customSet.size());
+    }
+
+    @Test
+    public void onAddingToSet_null_twice_returns_false_and_sizeOf_1() {
+        CustomSet<Integer> customSet = new CustomSet<>();
+        assertTrue(customSet.add(null));
+        assertEquals(1, customSet.size());
+        assertFalse(customSet.add(null));
+        assertEquals(1, customSet.size());
+    }
+
+    @Test
     public void onAddingToSet_10_returns_true_and_sizeOf_1() {
         CustomSet<Integer> customSet = new CustomSet<>();
         assertTrue(customSet.add(10));
         assertEquals(1, customSet.size());
     }
+
+    @Test
+    public void givenSetContainingOf_1_2_3_returnsFalse_onContainsNull() {
+        CustomSet<Integer> customSet = new CustomSet<>(List.of(1, 2, 3));
+        assertFalse(customSet.contains(null));
+    }
+
+    @Test
+    public void givenSetContaining_null_returnsTrue_onContainsNull() {
+        CustomSet<Integer> customSet = new CustomSet<>();
+        customSet.add(null);
+        assertTrue(customSet.contains(null));
+    }
+
 
     @Test
     public void onAddingToSet_10_20_returns_true_and_sizeOf_2() {
@@ -150,6 +180,24 @@ class CustomSetTest {
         CustomSet<Integer> customSet = new CustomSet<>(List.of(10, 20));
         assertEquals(2, customSet.size());
         assertFalse(customSet.remove(30));
+    }
+
+    @Test
+    public void onAddingToSet_10_20_onRemove_null_returns_false() {
+        CustomSet<Integer> customSet = new CustomSet<>(List.of(10, 20));
+        assertEquals(2, customSet.size());
+        assertFalse(customSet.remove(null));
+    }
+
+    @Test
+    public void onAddingToSet_10_null_20_onRemove_null_returns_false() {
+        CustomSet<Integer> customSet = new CustomSet<>();
+        customSet.add(10);
+        customSet.add(null);
+        customSet.add(20);
+        assertEquals(3, customSet.size());
+        assertTrue(customSet.remove(null));
+        assertEquals(2, customSet.size());
     }
 
     @Test
@@ -257,6 +305,12 @@ class CustomSetTest {
         c.add(20);
         c.add(30);
         assertTrue(customSet.containsAll(c));
+    }
+
+    @Test
+    public void givenSet_onAddingAllEmptyCollection_returnsFalse() {
+        CustomSet<Integer> customSet = new CustomSet<>(List.of(10, 20, 30));
+        assertFalse(customSet.addAll(List.of()));
     }
 
     @Test
@@ -471,7 +525,7 @@ class CustomSetTest {
     }
 
     @Test
-    public void givenSetOfType_Integer_withValues_1_2_3_onClone_returnsEqualSets() throws CloneNotSupportedException {
+    public void givenSetOfType_Integer_withValues_1_2_3_onClone_returnsEqualSets() {
         CustomSet<Integer> customSet = new CustomSet<>();
         customSet.add(1);
         customSet.add(2);
@@ -486,5 +540,90 @@ class CustomSetTest {
         for (int i = 0; i < x; i++)
             customSet.add(random.nextInt());
         return customSet;
+    }
+
+    @Test
+    void testTreeifyBinAndTreeNodeInsertion() {
+        CustomSet<CollidingKey> set = new CustomSet<>(64);
+        for (int i = 0; i < 10; i++) {
+            assertTrue(set.add(new CollidingKey(i)), "Should successfully add unique colliding key " + i);
+        }
+
+        assertEquals(10, set.size());
+        assertFalse(set.add(new CollidingKey(5)), "Adding duplicate element to tree bin should return false");
+        assertEquals(10, set.size());
+        assertTrue(set.add(new CollidingKey(100)), "Adding new element to tree bin should return true");
+        assertEquals(11, set.size());
+    }
+
+    @Test
+    void testTreeNodeContainsAndRemoval() {
+        CustomSet<CollidingKey> set = new CustomSet<>(64);
+
+        for (int i = 0; i < 12; i++) {
+            set.add(new CollidingKey(i));
+        }
+        assertTrue(set.contains(new CollidingKey(5)));
+        assertFalse(set.contains(new CollidingKey(999)));
+        assertTrue(set.remove(new CollidingKey(5)), "Should successfully remove element from tree bin");
+        assertFalse(set.contains(new CollidingKey(5)));
+        assertEquals(11, set.size());
+    }
+
+    @Test
+    void testTreeNodeSplitAndResizing() {
+        CustomSet<CollidingKey> set = new CustomSet<>(64);
+        for (int i = 0; i < 50; i++) {
+            set.add(new CollidingKey(i));
+        }
+        for (int i = 50; i < 80; i++) {
+            set.add(new CollidingKey(i));
+        }
+
+        assertEquals(80, set.size());
+        for (int i = 0; i < 80; i++) {
+            assertTrue(set.contains(new CollidingKey(i)), "Set should contain key " + i);
+        }
+    }
+
+    @Test
+    void testRemoveAllWhenCollectionLargerThanSet() {
+        CustomSet<String> set = new CustomSet<>();
+        set.add("apple");
+        set.add("banana");
+        java.util.List<String> largeCollection = java.util.Arrays.asList("apple", "banana", "cherry", "date");
+
+        boolean modified = set.removeAll(largeCollection);
+
+        assertTrue(modified, "Set should be modified after removing elements");
+        assertTrue(set.isEmpty(), "Set should be completely empty after removing all elements");
+    }
+
+    /**
+     * A custom object that forces hash code collisions to trigger bin treeification.
+     */
+    static class CollidingKey implements Comparable<CollidingKey> {
+        private final int id;
+
+        CollidingKey(int id) {
+            this.id = id;
+        }
+
+        @Override
+        public int hashCode() {
+            return 42;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof CollidingKey)) return false;
+            return this.id == ((CollidingKey) o).id;
+        }
+
+        @Override
+        public int compareTo(CollidingKey o) {
+            return Integer.compare(this.id, o.id);
+        }
     }
 }

@@ -133,7 +133,7 @@ for text in leg.get_texts():
     text.set_fontsize(14)
 
 plt.tight_layout(rect=[0, 0, 1, 0.97])
-output_path = os.path.join(OUTPUT_DIR, 'all_charts_grid_v3_v2.png')
+output_path = os.path.join(OUTPUT_DIR, 'grid.png')
 fig.savefig(
     output_path,
     dpi=150,
