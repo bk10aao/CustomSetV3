@@ -82,7 +82,8 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
      *
      * @param initialCapacity the initial capacity of the hash table
      * @param loadFactor      the load factor threshold for resizing
-     * @throws IllegalArgumentException if the initial capacity is negative or the load factor is non-positive, NaN, or infinite
+     * @throws IllegalArgumentException if the initial capacity is negative or the load factor is non-positive,
+     *                                  NaN, or infinite
      */
     public CustomSet(final int initialCapacity, final float loadFactor) {
         if (initialCapacity < 0 || loadFactor <= 0 || Float.isNaN(loadFactor) || Float.isInfinite(loadFactor))
@@ -441,7 +442,8 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
      * Returns an array containing all the elements in this set; the runtime type of
      * the returned array is that of the specified array.
      *
-     * @param a the array into which the elements of this set are to be stored, if it is big enough; otherwise, a new array of the same runtime type is allocated for this purpose
+     * @param a the array into which the elements of this set are to be stored, if it is big enough;
+     *          otherwise, a new array of the same runtime type is allocated for this purpose
      * @param <T> the runtime type of the array to contain the collection
      * @return an array containing all the elements in this set
      * @throws NullPointerException if the specified array is null
@@ -839,7 +841,8 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
          * @param h2 the hash of the second key
          * @param v1 the first key
          * @param v2 the second key
-         * @return a negative integer, zero, or a positive integer as the first key is less than, equal to, or greater than the second
+         * @return a negative integer, zero, or a positive integer as the first key is less than, equal to,
+         *          or greater than the second
          */
         private int compare(final int h1, final int h2, final E v1, final E v2) {
             if (h1 != h2)
