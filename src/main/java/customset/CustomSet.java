@@ -1,5 +1,7 @@
 package customset;
 
+import java.io.Serial;
+import java.io.Serializable;
 import java.util.Collection;
 import java.util.ConcurrentModificationException;
 import java.util.Iterator;
@@ -36,7 +38,11 @@ import static java.util.Objects.requireNonNullElseGet;
  * GitHub account bk10aao - <a href="https://github.com/bk10aao"/>
  * Repository - <a href="https://github.com/bk10aao/CustomSetV3"/>
  */
-public class CustomSet<E> implements Set<E>, Cloneable {
+public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     private boolean CONTAINS_NULL = false;
 
     private final float loadFactor;
