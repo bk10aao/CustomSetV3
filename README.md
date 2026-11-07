@@ -16,51 +16,53 @@ All methods implemented are identical to those found in the Java [Set](https://d
 
 ## Time Complexity
 
-| Operation                        |            CustomSet V3 Complexity            |           JDK `HashSet` Complexity            | Winner  |
-|:---------------------------------|:---------------------------------------------:|:---------------------------------------------:|:-------:|
-| **`constructor()`**              |                    $O(1)$                     |                    $O(1)$                     | **Tie** |
-| **`constructor(capacity)`**      |                    $O(1)$                     |                    $O(1)$                     | **Tie** |
-| **`constructor(Collection c)`**  |            $O(N)$ / $O(N \log N)$             |            $O(N)$ / $O(N \log N)$             | **Tie** |
-| **`add(E e)`**                   | **$O(1)$** (Amortized)<br>$O(\log N)$ (Worst) | **$O(1)$** (Amortized)<br>$O(\log N)$ (Worst) | **Tie** |
-| **`addAll(Collection c)`**       |            $O(M)$ / $O(M \log N)$             |            $O(M)$ / $O(M \log N)$             | **Tie** |
-| **`clone()`**                    |                    $O(N)$                     |                    $O(N)$                     | **Tie** |
-| **`contains(Object o)`**         |    **$O(1)$** (Avg)<br>$O(\log N)$ (Worst)    |    **$O(1)$** (Avg)<br>$O(\log N)$ (Worst)    | **Tie** |
-| **`clear()`**                    |                    $O(C)$                     |                    $O(C)$                     | **Tie** |
-| **`containsAll(Collection c)`**  |                 $O(M \log N)$                 |                 $O(M \log N)$                 | **Tie** |
-| **`equals(Object o)`**           |            $O(N)$ / $O(N \log N)$             |            $O(N)$ / $O(N \log N)$             | **Tie** |
-| **`hashCode()`**                 |                  $O(N + C)$                   |                  $O(N + C)$                   | **Tie** |
-| **`isEmpty()`**                  |                    $O(1)$                     |                    $O(1)$                     | **Tie** |
-| **`iterator()`**                 |    $O(1)$ (Init)<br>$O(N + C)$ (Traversal)    |    $O(1)$ (Init)<br>$O(N + C)$ (Traversal)    | **Tie** |
-| **`remove(Object o)`**           |    **$O(1)$** (Avg)<br>$O(\log N)$ (Worst)    |    **$O(1)$** (Avg)<br>$O(\log N)$ (Worst)    | **Tie** |
-| **`removeAll(Collection c)`**    | $O(\min(M \log N, N \cdot \text{contains}))$  | $O(\min(M \log N, N \cdot \text{contains}))$  | **Tie** |
-| **`retainAll(Collection c)`**    |         $O(N \cdot \text{contains})$          |         $O(N \cdot \text{contains})$          | **Tie** |
-| **`size()`**                     |                    $O(1)$                     |                    $O(1)$                     | **Tie** |
-| **`toArray()` / `toArray(T[])`** |                  $O(N + C)$                   |                  $O(N + C)$                   | **Tie** |
-| **`toString()`**                 |                  $O(N + C)$                   |                  $O(N + C)$                   | **Tie** |
+| Operation                       |                      V3                       |                 JDK `HashSet`                 | Winner  |
+|:--------------------------------|:---------------------------------------------:|:---------------------------------------------:|:-------:|
+| **`constructor()`**             |                    $O(1)$                     |                    $O(1)$                     | **Tie** |
+| **`constructor(capacity)`**     |                    $O(1)$                     |                    $O(1)$                     | **Tie** |
+| **`constructor(Collection c)`** |            $O(N)$ / $O(N \log N)$             |            $O(N)$ / $O(N \log N)$             | **Tie** |
+| **`add(E e)`**                  | **$O(1)$** (Amortized)<br>$O(\log N)$ (Worst) | **$O(1)$** (Amortized)<br>$O(\log N)$ (Worst) | **Tie** |
+| **`addAll(Collection c)`**      |            $O(M)$ / $O(M \log N)$             |            $O(M)$ / $O(M \log N)$             | **Tie** |
+| **`clone()`**                   |                    $O(N)$                     |                    $O(N)$                     | **Tie** |
+| **`contains(Object o)`**        |    **$O(1)$** (Avg)<br>$O(\log N)$ (Worst)    |    **$O(1)$** (Avg)<br>$O(\log N)$ (Worst)    | **Tie** |
+| **`clear()`**                   |                    $O(C)$                     |                    $O(C)$                     | **Tie** |
+| **`containsAll(Collection c)`** |                 $O(M \log N)$                 |                 $O(M \log N)$                 | **Tie** |
+| **`equals(Object o)`**          |            $O(N)$ / $O(N \log N)$             |            $O(N)$ / $O(N \log N)$             | **Tie** |
+| **`hashCode()`**                |                  $O(N + C)$                   |                  $O(N + C)$                   | **Tie** |
+| **`isEmpty()`**                 |                    $O(1)$                     |                    $O(1)$                     | **Tie** |
+| **`iterator()`**                |    $O(1)$ (Init)<br>$O(N + C)$ (Traversal)    |    $O(1)$ (Init)<br>$O(N + C)$ (Traversal)    | **Tie** |
+| **`remove(Object o)`**          |    **$O(1)$** (Avg)<br>$O(\log N)$ (Worst)    |    **$O(1)$** (Avg)<br>$O(\log N)$ (Worst)    | **Tie** |
+| **`removeAll(Collection c)`**   | $O(\min(M \log N, N \cdot \text{contains}))$  | $O(\min(M \log N, N \cdot \text{contains}))$  | **Tie** |
+| **`retainAll(Collection c)`**   |         $O(N \cdot \text{contains})$          |         $O(N \cdot \text{contains})$          | **Tie** |
+| **`size()`**                    |                    $O(1)$                     |                    $O(1)$                     | **Tie** |
+| **`toArray()`**                 |                  $O(N + C)$                   |                  $O(N + C)$                   | **Tie** |
+| **`toArray(T[])`**              |                  $O(N + C)$                   |                  $O(N + C)$                   | **Tie** |
+| **`toString()`**                |                  $O(N + C)$                   |                  $O(N + C)$                   | **Tie** |
 
 ## Space Complexity
 
-| Operation                        |                     V3 Space                      |                     JDK Space                     | Winner  |
-|:---------------------------------|:-------------------------------------------------:|:-------------------------------------------------:|:-------:|
-| **`constructor()`**              |                      $O(1)$                       |                      $O(1)$                       | **Tie** |
-| **`constructor(capacity)`**      |                      $O(C)$                       |                      $O(C)$                       | **Tie** |
-| **`constructor(Collection c)`**  |            $O(N + C)$ (Direct storage)            |        $O(N + C)$ (Wrapped node overhead)         | **V3**  |
-| **`add(E e)`**                   |   $O(1)$ (Amortized)<br>$O(\log N)$ (Tree bin)    |   $O(1)$ (Amortized)<br>$O(\log N)$ (Tree bin)    | **Tie** |
-| **`addAll(Collection c)`**       |              $O(M + C_{\text{new}})$              |              $O(M + C_{\text{new}})$              | **Tie** |
-| **`clone()`**                    |             $O(N + C)$ (Shallow copy)             |             $O(N + C)$ (Shallow copy)             | **Tie** |
-| **`contains(Object o)`**         |                      $O(1)$                       |                      $O(1)$                       | **Tie** |
-| **`clear()`**                    |           $O(1)$ (In-place array reset)           |           $O(1)$ (In-place array reset)           | **Tie** |
-| **`containsAll(Collection c)`**  |                      $O(1)$                       |                      $O(1)$                       | **Tie** |
-| **`equals(Object o)`**           |                      $O(1)$                       |                      $O(1)$                       | **Tie** |
-| **`hashCode()`**                 |                      $O(1)$                       |                      $O(1)$                       | **Tie** |
-| **`isEmpty()`**                  |                      $O(1)$                       |                      $O(1)$                       | **Tie** |
-| **`iterator()`**                 |            $O(1)$ (Cursor state only)             |            $O(1)$ (Cursor state only)             | **Tie** |
-| **`remove(Object o)`**           |                      $O(1)$                       |                      $O(1)$                       | **Tie** |
-| **`removeAll(Collection c)`**    |                      $O(1)$                       |                      $O(1)$                       | **Tie** |
-| **`retainAll(Collection c)`**    |                      $O(1)$                       |                      $O(1)$                       | **Tie** |
-| **`size()`**                     |                      $O(1)$                       |                      $O(1)$                       | **Tie** |
-| **`toArray()` / `toArray(T[])`** |             $O(N)$ (New array output)             |             $O(N)$ (New array output)             | **Tie** |
-| **`toString()`**                 |              $O(N)$ (String buffer)               |              $O(N)$ (String buffer)               | **Tie** |
+| Operation                       |                      V3                      |                JDK `HashSet`                 | Winner  |
+|:--------------------------------|:--------------------------------------------:|:--------------------------------------------:|:-------:|
+| **`constructor()`**             |                    $O(1)$                    |                    $O(1)$                    | **Tie** |
+| **`constructor(capacity)`**     |                    $O(C)$                    |                    $O(C)$                    | **Tie** |
+| **`constructor(Collection c)`** |         $O(N + C)$ (Direct storage)          |      $O(N + C)$ (Wrapped node overhead)      | **V3**  |
+| **`add(E e)`**                  | $O(1)$ (Amortized)<br>$O(\log N)$ (Tree bin) | $O(1)$ (Amortized)<br>$O(\log N)$ (Tree bin) | **Tie** |
+| **`addAll(Collection c)`**      |           $O(M + C_{\text{new}})$            |           $O(M + C_{\text{new}})$            | **Tie** |
+| **`clone()`**                   |          $O(N + C)$ (Shallow copy)           |          $O(N + C)$ (Shallow copy)           | **Tie** |
+| **`contains(Object o)`**        |                    $O(1)$                    |                    $O(1)$                    | **Tie** |
+| **`clear()`**                   |        $O(1)$ (In-place array reset)         |        $O(1)$ (In-place array reset)         | **Tie** |
+| **`containsAll(Collection c)`** |                    $O(1)$                    |                    $O(1)$                    | **Tie** |
+| **`equals(Object o)`**          |                    $O(1)$                    |                    $O(1)$                    | **Tie** |
+| **`hashCode()`**                |                    $O(1)$                    |                    $O(1)$                    | **Tie** |
+| **`isEmpty()`**                 |                    $O(1)$                    |                    $O(1)$                    | **Tie** |
+| **`iterator()`**                |          $O(1)$ (Cursor state only)          |          $O(1)$ (Cursor state only)          | **Tie** |
+| **`remove(Object o)`**          |                    $O(1)$                    |                    $O(1)$                    | **Tie** |
+| **`removeAll(Collection c)`**   |                    $O(1)$                    |                    $O(1)$                    | **Tie** |
+| **`retainAll(Collection c)`**   |                    $O(1)$                    |                    $O(1)$                    | **Tie** |
+| **`size()`**                    |                    $O(1)$                    |                    $O(1)$                    | **Tie** |
+| **`toArray()`**                 |          $O(N)$ (New array output)           |          $O(N)$ (New array output)           | **Tie** |
+| **`toArray(T[])`**              |          $O(N)$ (New array output)           |          $O(N)$ (New array output)           | **Tie** |
+| **`toString()`**                |            $O(N)$ (String buffer)            |            $O(N)$ (String buffer)            | **Tie** |
 
 ### Asymptotic Variables & Parameters
 
