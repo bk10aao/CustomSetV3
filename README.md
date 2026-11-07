@@ -12,7 +12,7 @@ All methods implemented are identical to those found in the Java [Set](https://d
 ## Build and Test
 
 1. To build and test the project run command `./gradlew clean build`
-2. To test the project run command `gradle test --tests customset.CustomSetTest`
+2. To test the project run command ` ./gradlew clean test`
 
 ## Time Complexity
 
