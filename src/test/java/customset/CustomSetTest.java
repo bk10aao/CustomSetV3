@@ -1,13 +1,20 @@
 package customset;
 
+import customset.CustomSet.CustomSetSpliterator;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.ConcurrentModificationException;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
+import java.util.Spliterator;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
@@ -16,6 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -599,9 +608,6 @@ public class CustomSetTest {
         assertTrue(set.isEmpty(), "Set should be completely empty after removing all elements");
     }
 
-    /**
-     * A custom object that forces hash code collisions to trigger bin treeification.
-     */
     static class CollidingKey implements Comparable<CollidingKey> {
         private final int id;
 
@@ -625,5 +631,362 @@ public class CustomSetTest {
         public int compareTo(CollidingKey o) {
             return Integer.compare(this.id, o.id);
         }
+    }
+
+    @Test
+    void spliterator_estimateSize_matchesSetSize() {
+        CustomSet<Integer> set = createDynamicSet(100);
+        assertEquals(100, set.spliterator().estimateSize());
+    }
+
+    @Test
+    void spliterator_characteristics_areCorrect() {
+        CustomSet<Integer> set = new CustomSet<>();
+        int characteristics = set.spliterator().characteristics();
+
+        assertTrue((characteristics & Spliterator.DISTINCT) != 0);
+        assertTrue((characteristics & Spliterator.SIZED) != 0);
+        assertTrue((characteristics & Spliterator.SUBSIZED) != 0);
+    }
+
+    @Test
+    void spliterator_tryAdvance_visitsAllElements() {
+        CustomSet<Integer> set = new CustomSet<>(List.of(10, 20, 30, 40, 50));
+        Spliterator<Integer> spliterator = set.spliterator();
+
+        Set<Integer> seen = new HashSet<>();
+        while (spliterator.tryAdvance(seen::add)) { }
+
+        assertEquals(5, seen.size());
+        assertTrue(seen.containsAll(List.of(10, 20, 30, 40, 50)));
+        assertEquals(0, spliterator.estimateSize());
+    }
+
+    @Test
+    void spliterator_forEachRemaining_visitsAllElements() {
+        CustomSet<Integer> set = new CustomSet<>(List.of(1, 2, 3, 4, 5));
+        Spliterator<Integer> spliterator = set.spliterator();
+
+        List<Integer> collected = new ArrayList<>();
+        spliterator.forEachRemaining(collected::add);
+
+        assertEquals(5, collected.size());
+        assertTrue(collected.containsAll(List.of(1, 2, 3, 4, 5)));
+    }
+
+    @Test
+    void spliterator_handlesNullElement() {
+        CustomSet<Integer> set = new CustomSet<>();
+        set.add(null);
+        set.add(10);
+        set.add(20);
+
+        Spliterator<Integer> spliterator = set.spliterator();
+        List<Integer> collected = new ArrayList<>();
+        spliterator.forEachRemaining(collected::add);
+
+        assertEquals(3, collected.size());
+        assertTrue(collected.contains(null));
+        assertTrue(collected.contains(10));
+        assertTrue(collected.contains(20));
+    }
+
+    @Test
+    void spliterator_trySplit_producesValidSplit() {
+        CustomSet<Integer> set = createDynamicSet(100);
+        Spliterator<Integer> original = set.spliterator();
+
+        Spliterator<Integer> split = original.trySplit();
+        assertNotNull(split);
+
+        long originalEst = original.estimateSize();
+        long splitEst = split.estimateSize();
+
+        assertTrue(originalEst >= 0);
+        assertTrue(splitEst >= 0);
+        assertTrue(originalEst + splitEst <= 100 + 5);
+    }
+
+    @Test
+    void spliterator_trySplit_onSmallSet_returnsNull() {
+        CustomSet<Integer> set = new CustomSet<>(List.of(1));
+        Spliterator<Integer> spliterator = set.spliterator();
+        assertNull(spliterator.trySplit());
+    }
+
+    @Test
+    void spliterator_trySplit_thenAdvance_coversAllElements() {
+        CustomSet<Integer> set = createDynamicSet(50);
+        Spliterator<Integer> left = set.spliterator();
+        Spliterator<Integer> right = left.trySplit();
+
+        HashSet<Integer> all = new HashSet<>();
+
+        if (right != null) {
+            right.forEachRemaining(all::add);
+        }
+        left.forEachRemaining(all::add);
+
+        assertEquals(50, all.size());
+    }
+
+    @Test
+    void spliterator_isFailFast_onStructuralModification() {
+        CustomSet<Integer> set = new CustomSet<>(List.of(1, 2, 3, 4, 5));
+        Spliterator<Integer> spliterator = set.spliterator();
+        set.add(99);
+        assertThrows(ConcurrentModificationException.class, () -> spliterator.tryAdvance(e -> {}));
+    }
+
+    @Test
+    void spliterator_isFailFast_onClear() {
+        CustomSet<Integer> set = new CustomSet<>(List.of(1, 2, 3));
+        Spliterator<Integer> spliterator = set.spliterator();
+
+        set.clear();
+
+        assertThrows(ConcurrentModificationException.class,
+                () -> spliterator.forEachRemaining(e -> {}));
+    }
+
+    @Test
+    void spliterator_withCollidingKeys_stillWorks() {
+        CustomSet<CollidingKey> set = new CustomSet<>(64);
+        for (int i = 0; i < 20; i++) {
+            set.add(new CollidingKey(i));
+        }
+
+        Spliterator<CollidingKey> spliterator = set.spliterator();
+        HashSet<CollidingKey> seen = new HashSet<>();
+
+        spliterator.forEachRemaining(seen::add);
+
+        assertEquals(20, seen.size());
+    }
+
+    @Test
+    void spliterator_trySplit_multipleTimes() {
+        CustomSet<Integer> set = createDynamicSet(200);
+        Spliterator<Integer> s1 = set.spliterator();
+
+        Spliterator<Integer> s2 = s1.trySplit();
+        Spliterator<Integer> s3 = s1.trySplit();
+
+        Set<Integer> all = new HashSet<>();
+
+        if (s2 != null)
+            s2.forEachRemaining(all::add);
+        if (s3 != null)
+            s3.forEachRemaining(all::add);
+        s1.forEachRemaining(all::add);
+        assertEquals(200, all.size());
+    }
+
+    @Test
+    void spliterator_trySplit_intraChain_splitsSuccessfully() {
+        CustomSet<String> set = new CustomSet<>(4);
+        for (int i = 0; i < 20; i++) {
+            set.add("Key-" + i);
+        }
+
+        Spliterator<String> spliterator = set.spliterator();
+        Spliterator<String> prefix = spliterator.trySplit();
+
+        assertNotNull(prefix, "Spliterator should successfully split");
+
+        Set<String> collected = new HashSet<>();
+        prefix.forEachRemaining(collected::add);
+        spliterator.forEachRemaining(collected::add);
+
+        assertEquals(20, collected.size());
+    }
+
+    @Test
+    void spliterator_trySplit_intraChain_forcesExecution() {
+        class CollidingKey implements Comparable<CollidingKey> {
+            private final String name;
+            CollidingKey(String name) { this.name = name; }
+            @Override public int hashCode() { return 0; }
+            @Override public boolean equals(Object o) {
+                return o instanceof CollidingKey && ((CollidingKey) o).name.equals(name);
+            }
+            @Override public int compareTo(CollidingKey o) {
+                return name.compareTo(o.name);
+            }
+        }
+
+        CustomSet<CollidingKey> set = new CustomSet<>(16);
+        set.add(new CollidingKey("A"));
+        set.add(new CollidingKey("B"));
+        set.add(new CollidingKey("C"));
+        set.add(new CollidingKey("D"));
+        set.add(new CollidingKey("E"));
+
+        CustomSetSpliterator<CollidingKey> spliterator =
+                new CustomSetSpliterator<>(set, 0, 1, 5, set.size(), false);
+        spliterator.estimateSize();
+
+        Spliterator<CollidingKey> splitPart = spliterator.trySplit();
+
+        assertNotNull(splitPart, "Intra-chain split should trigger when chainSize >= 4 in a single bucket");
+
+        Set<CollidingKey> collected = new HashSet<>();
+        splitPart.forEachRemaining(collected::add);
+        spliterator.forEachRemaining(collected::add);
+
+        assertEquals(5, collected.size());
+    }
+
+    @Test
+    void treeBin_untreeifies_whenElementsRemovedBelowThreshold() {
+        CustomSet<CollidingKey> set = new CustomSet<>(64);
+        for (int i = 0; i < 12; i++)
+            set.add(new CollidingKey(i));
+        assertEquals(12, set.size());
+        for (int i = 0; i < 7; i++) {
+            CollidingKey k = new CollidingKey(i);
+            System.out.println(k + " " + i);
+            assertTrue(set.remove(k));
+        }
+
+        assertEquals(5, set.size());
+        for (int i = 7; i < 12; i++) {
+            CollidingKey k = new CollidingKey(i);
+            System.out.println(k + " " + i);
+            assertTrue(set.contains(k));
+        }
+    }
+
+    @Test
+    void treeBin_removeRootAndInternalNodes() {
+        CustomSet<CollidingKey> set = new CustomSet<>(64);
+        for (int i = 0; i < 15; i++)
+            set.add(new CollidingKey(i));
+        assertTrue(set.remove(new CollidingKey(0)));
+        assertTrue(set.remove(new CollidingKey(7)));
+        assertTrue(set.remove(new CollidingKey(14)));
+        assertEquals(12, set.size());
+    }
+
+    @Test
+    void treeBin_iterator_and_spliterator_work_on_tree() {
+        CustomSet<CollidingKey> set = new CustomSet<>(64);
+        for (int i = 0; i < 20; i++)
+            set.add(new CollidingKey(i));
+        int count = 0;
+        for (CollidingKey ignored : set)
+            count++;
+        assertEquals(20, count);
+        Set<CollidingKey> seen = new HashSet<>();
+        set.spliterator().forEachRemaining(seen::add);
+        assertEquals(20, seen.size());
+    }
+
+    @Test
+    void concurrentModification_onIterator_throws() {
+        CustomSet<Integer> set = new CustomSet<>(List.of(1, 2, 3, 4, 5));
+        Iterator<Integer> it = set.iterator();
+
+        it.next();
+        set.add(99);
+
+        assertThrows(ConcurrentModificationException.class, it::next);
+    }
+
+    @Test
+    void concurrentModification_onIterator_remove_isAllowed() {
+        CustomSet<Integer> set = new CustomSet<>(List.of(1, 2, 3, 4, 5));
+        Iterator<Integer> it = set.iterator();
+
+        while (it.hasNext())
+            if (it.next().equals(3))
+                it.remove();
+
+        assertFalse(set.contains(3));
+        assertEquals(4, set.size());
+    }
+
+    @Test
+    void largeTree_survives_multiple_resizes() {
+        CustomSet<CollidingKey> set = new CustomSet<>(16);
+
+        for (int i = 0; i < 200; i++)
+            set.add(new CollidingKey(i));
+
+        assertEquals(200, set.size());
+
+        for (int i = 0; i < 200; i++)
+            assertTrue(set.contains(new CollidingKey(i)));
+
+        for (int i = 0; i < 100; i++)
+            assertTrue(set.remove(new CollidingKey(i)));
+
+        assertEquals(100, set.size());
+    }
+
+    @Test
+    void testSerializationRoundTrip() throws Exception {
+        CustomSet<String> set = new CustomSet<>();
+        set.add("A");
+        set.add(null);
+        set.add("B");
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (ObjectOutputStream oos = new ObjectOutputStream(baos)) {
+            oos.writeObject(set);
+        }
+
+        CustomSet<String> deserialized;
+        try (java.io.ObjectInputStream ois = new java.io.ObjectInputStream(
+                new java.io.ByteArrayInputStream(baos.toByteArray()))) {
+            deserialized = (CustomSet<String>) ois.readObject();
+        }
+
+        assertEquals(set.size(), deserialized.size());
+        assertTrue(deserialized.contains("A"));
+        assertTrue(deserialized.contains("B"));
+        assertTrue(deserialized.contains(null));
+    }
+
+    @Test
+    void testCloneIndependence() {
+        CustomSet<Integer> set = new CustomSet<>(List.of(1, 2, 3));
+        CustomSet<Integer> clone = set.clone();
+
+        assertEquals(set, clone);
+        clone.add(4);
+        assertFalse(set.contains(4), "Modifying clone should not affect original set");
+    }
+
+    @Test
+    void spliterator_trySplit_onSmallOrNullSpliterator() {
+        CustomSet<Integer> set = new CustomSet<>();
+        Spliterator<Integer> s1 = set.spliterator();
+        assertNull(s1.trySplit(), "Empty set spliterator should return null on trySplit");
+
+        set.add(null);
+        Spliterator<Integer> s2 = set.spliterator();
+        assertNull(s2.trySplit(), "Spliterator containing only null should return null on trySplit");
+    }
+
+    @Test
+    void testRotateRightAndRootDeepTraversal() {
+        CustomSet<CollidingKey> set = new CustomSet<>(64);
+        for (int i = 10; i >= 0; i--)
+            set.add(new CollidingKey(i));
+
+        for (int i = 0; i <= 10; i++)
+            assertTrue(set.contains(new CollidingKey(i)), "Should find key " + i);
+
+        assertEquals(11, set.size());
+    }
+
+    @Test
+    void testTreeNodeRootDirectTraversal() {
+        CustomSet<CollidingKey> set = new CustomSet<>(64);
+        for (int i = 0; i < 15; i++)
+            set.add(new CollidingKey(i));
+        assertTrue(set.contains(new CollidingKey(10)));
+        assertTrue(set.contains(new CollidingKey(2)));
     }
 }

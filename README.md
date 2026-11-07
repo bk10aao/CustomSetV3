@@ -40,27 +40,27 @@ All methods implemented are identical to those found in the Java [Set](https://d
 
 ## Space Complexity
 
-| Operation                        |                      V3                      |                     JDK                      | Winner  |
-|:---------------------------------|:--------------------------------------------:|:--------------------------------------------:|:-------:|
-| **`constructor()`**              |                    $O(1)$                    |                    $O(1)$                    | **Tie** |
-| **`constructor(capacity)`**      |                    $O(C)$                    |                    $O(C)$                    | **Tie** |
-| **`constructor(Collection c)`**  |                  $O(N + C)$                  |                  $O(N + C)$                  | **Tie** |
-| **`add(E e)`**                   | $O(1)$ (Amortized)<br>$O(\log N)$ (Tree bin) | $O(1)$ (Amortized)<br>$O(\log N)$ (Tree bin) | **Tie** |
-| **`addAll(Collection c)`**       |           $O(M + C_{\text{new}})$            |           $O(M + C_{\text{new}})$            | **Tie** |
-| **`clone()`**                    |                  $O(N + C)$                  |                  $O(N + C)$                  | **Tie** |
-| **`contains(Object o)`**         |                    $O(1)$                    |                    $O(1)$                    | **Tie** |
-| **`clear()`**                    |        $O(1)$ (In-place array reset)         |        $O(1)$ (In-place array reset)         | **Tie** |
-| **`containsAll(Collection c)`**  |                    $O(1)$                    |                    $O(1)$                    | **Tie** |
-| **`equals(Object o)`**           |                    $O(1)$                    |                    $O(1)$                    | **Tie** |
-| **`hashCode()`**                 |                    $O(1)$                    |                    $O(1)$                    | **Tie** |
-| **`isEmpty()`**                  |                    $O(1)$                    |                    $O(1)$                    | **Tie** |
-| **`iterator()`**                 |          $O(1)$ (Cursor state only)          |          $O(1)$ (Cursor state only)          | **Tie** |
-| **`remove(Object o)`**           |                    $O(1)$                    |                    $O(1)$                    | **Tie** |
-| **`removeAll(Collection c)`**    |                    $O(1)$                    |                    $O(1)$                    | **Tie** |
-| **`retainAll(Collection c)`**    |                    $O(1)$                    |                    $O(1)$                    | **Tie** |
-| **`size()`**                     |                    $O(1)$                    |                    $O(1)$                    | **Tie** |
-| **`toArray()` / `toArray(T[])`** |          $O(N)$ (New array output)           |          $O(N)$ (New array output)           | **Tie** |
-| **`toString()`**                 |            $O(N)$ (String buffer)            |            $O(N)$ (String buffer)            | **Tie** |
+| Operation                        |                     V3 Space                      |                     JDK Space                     | Winner  |
+|:---------------------------------|:-------------------------------------------------:|:-------------------------------------------------:|:-------:|
+| **`constructor()`**              |                      $O(1)$                       |                      $O(1)$                       | **Tie** |
+| **`constructor(capacity)`**      |                      $O(C)$                       |                      $O(C)$                       | **Tie** |
+| **`constructor(Collection c)`**  |            $O(N + C)$ (Direct storage)            |        $O(N + C)$ (Wrapped node overhead)         | **V3**  |
+| **`add(E e)`**                   |   $O(1)$ (Amortized)<br>$O(\log N)$ (Tree bin)    |   $O(1)$ (Amortized)<br>$O(\log N)$ (Tree bin)    | **Tie** |
+| **`addAll(Collection c)`**       |              $O(M + C_{\text{new}})$              |              $O(M + C_{\text{new}})$              | **Tie** |
+| **`clone()`**                    |             $O(N + C)$ (Shallow copy)             |             $O(N + C)$ (Shallow copy)             | **Tie** |
+| **`contains(Object o)`**         |                      $O(1)$                       |                      $O(1)$                       | **Tie** |
+| **`clear()`**                    |           $O(1)$ (In-place array reset)           |           $O(1)$ (In-place array reset)           | **Tie** |
+| **`containsAll(Collection c)`**  |                      $O(1)$                       |                      $O(1)$                       | **Tie** |
+| **`equals(Object o)`**           |                      $O(1)$                       |                      $O(1)$                       | **Tie** |
+| **`hashCode()`**                 |                      $O(1)$                       |                      $O(1)$                       | **Tie** |
+| **`isEmpty()`**                  |                      $O(1)$                       |                      $O(1)$                       | **Tie** |
+| **`iterator()`**                 |            $O(1)$ (Cursor state only)             |            $O(1)$ (Cursor state only)             | **Tie** |
+| **`remove(Object o)`**           |                      $O(1)$                       |                      $O(1)$                       | **Tie** |
+| **`removeAll(Collection c)`**    |                      $O(1)$                       |                      $O(1)$                       | **Tie** |
+| **`retainAll(Collection c)`**    |                      $O(1)$                       |                      $O(1)$                       | **Tie** |
+| **`size()`**                     |                      $O(1)$                       |                      $O(1)$                       | **Tie** |
+| **`toArray()` / `toArray(T[])`** |             $O(N)$ (New array output)             |             $O(N)$ (New array output)             | **Tie** |
+| **`toString()`**                 |              $O(N)$ (String buffer)               |              $O(N)$ (String buffer)               | **Tie** |
 
 ### Asymptotic Variables & Parameters
 
@@ -72,51 +72,51 @@ All methods implemented are identical to those found in the Java [Set](https://d
 
 ### V3 vs JDK
 
-| Method                        | V3 (ns)  | JDK (ns) |            Winner            | Margin |
-|:------------------------------|:---------|:---------|:----------------------------:|:------:|
-| **`add(E)`**                  | 145394   | 229506   |            **V3**            | 1.58×  |
-| **`addAll(Collection)`**      | 129863   | 264354   |            **V3**            | 2.04×  |
-| **`clear()`**                 | 13619    | 14886    | **Statistically Equivalent** | 1.09×  |
-| **`clone()`**                 | 125162   | 227002   |            **V3**            | 1.81×  |
-| **`constructor()`**           | 44       | 49       | **Statistically Equivalent** | 1.11×  |
-| **`constructor(Collection)`** | 97070    | 198857   |            **V3**            | 2.05×  |
-| **`contains(Object)`**        | 41       | 66       |            **V3**            | 1.61×  |
-| **`containsAll(Collection)`** | 5207     | 15828    |            **V3**            | 3.04×  |
-| **`equals(Object)`**          | 251750   | 693257   |            **V3**            | 2.75×  |
-| **`hashCode()`**              | 49862    | 140641   |            **V3**            | 2.82×  |
-| **`isEmpty()`**               | 37       | 71       |            **V3**            | 1.92×  |
-| **`iterator()`**              | 64573    | 181739   |            **V3**            | 2.81×  |
-| **`remove(Object)`**          | 44       | 118      |            **V3**            | 2.68×  |
-| **`removeAll(Collection)`**   | 17551    | 39977    |            **V3**            | 2.28×  |
-| **`retainAll(Collection)`**   | 89072297 | 93672223 | **Statistically Equivalent** | 1.05×  |
-| **`size()`**                  | 52       | 40       | **Statistically Equivalent** | 1.30×  |
-| **`toArray()`**               | 55145    | 61206    | **Statistically Equivalent** | 1.11×  |
-| **`toArray(T[])`**            | 67277    | 86787    |            **V3**            | 1.29×  |
-| **`toString()`**              | 473965   | 482031   | **Statistically Equivalent** | 1.02×  |
+| Method                        | V3 (ns)    | JDK (ns)   |            Winner            | Margin |
+|:------------------------------|:-----------|:-----------|:----------------------------:|:------:|
+| **`add(E)`**                  | 146,366    | 234,506    |            **V3**            | 1.60×  |
+| **`addAll(Collection)`**      | 92,164     | 247,432    |            **V3**            | 2.68×  |
+| **`clear()`**                 | 13,564     | 14,886     | **Statistically Equivalent** | 1.10×  |
+| **`clone()`**                 | 124,779    | 237,006    |            **V3**            | 1.90×  |
+| **`constructor()`**           | 41         | 49         |            **V3**            | 1.20×  |
+| **`constructor(Collection)`** | 92,395     | 191,957    |            **V3**            | 2.08×  |
+| **`contains(Object)`**        | 37         | 66         |            **V3**            | 1.78×  |
+| **`containsAll(Collection)`** | 5,031      | 16,117     |            **V3**            | 3.20×  |
+| **`equals(Object)`**          | 243,488    | 835,394    |            **V3**            | 3.43×  |
+| **`hashCode()`**              | 49,486     | 146,478    |            **V3**            | 2.96×  |
+| **`isEmpty()`**               | 33         | 63         |            **V3**            | 1.91×  |
+| **`iterator()`**              | 61,863     | 176,145    |            **V3**            | 2.85×  |
+| **`remove(Object)`**          | 38         | 113        |            **V3**            | 2.97×  |
+| **`removeAll(Collection)`**   | 17,521     | 39,788     |            **V3**            | 2.27×  |
+| **`retainAll(Collection)`**   | 95,070,383 | 95,849,271 | **Statistically Equivalent** | 1.01×  |
+| **`size()`**                  | 33         | 41         |            **V3**            | 1.24×  |
+| **`toArray()`**               | 53,764     | 60,653     | **Statistically Equivalent** | 1.13×  |
+| **`toArray(T[])`**            | 64,664     | 86,634     |            **V3**            | 1.34×  |
+| **`toString()`**              | 484,510    | 488,435    | **Statistically Equivalent** | 1.01×  |
 
 ### V3 vs V2
 
-| Method                        | V3 (ns)  | V2 (ns)  |            Winner            | Margin |
-|:------------------------------|:---------|:---------|:----------------------------:|:------:|
-| **`add(E)`**                  | 145394   | 233182   |            **V3**            | 1.60×  |
-| **`addAll(Collection)`**      | 129863   | 255128   |            **V3**            | 1.96×  |
-| **`clear()`**                 | 13619    | 13735    | **Statistically Equivalent** | 1.01×  |
-| **`clone()`**                 | 125162   | 195211   |            **V3**            | 1.56×  |
-| **`constructor()`**           | 44       | 40       | **Statistically Equivalent** | 1.10×  |
-| **`constructor(Collection)`** | 97070    | 197882   |            **V3**            | 2.04×  |
-| **`contains(Object)`**        | 41       | 100      |            **V3**            | 2.44×  |
-| **`containsAll(Collection)`** | 5207     | 16922    |            **V3**            | 3.25×  |
-| **`equals(Object)`**          | 251750   | 452081   |            **V3**            | 1.80×  |
-| **`hashCode()`**              | 49862    | 64098    |            **V3**            | 1.29×  |
-| **`isEmpty()`**               | 37       | 42       | **Statistically Equivalent** | 1.14×  |
-| **`iterator()`**              | 64573    | 100736   |            **V3**            | 1.56×  |
-| **`remove(Object)`**          | 44       | 66       |            **V3**            | 1.50×  |
-| **`removeAll(Collection)`**   | 17551    | 35869    |            **V3**            | 2.04×  |
-| **`retainAll(Collection)`**   | 89072297 | 93187198 | **Statistically Equivalent** | 1.05×  |
-| **`size()`**                  | 52       | 38       | **Statistically Equivalent** | 1.37×  |
-| **`toArray()`**               | 55145    | 56113    | **Statistically Equivalent** | 1.02×  |
-| **`toArray(T[])`**            | 67277    | 65604    | **Statistically Equivalent** | 1.03×  |
-| **`toString()`**              | 473965   | 467994   | **Statistically Equivalent** | 1.01×  |
+| Method                        | V3 (ns)    | V2 (ns)    |            Winner            | Margin |
+|:------------------------------|:-----------|:-----------|:----------------------------:|:------:|
+| **`add(E)`**                  | 146,366    | 233,182    |            **V3**            | 1.59×  |
+| **`addAll(Collection)`**      | 92,164     | 255,128    |            **V3**            | 2.77×  |
+| **`clear()`**                 | 13,564     | 13,735     | **Statistically Equivalent** | 1.01×  |
+| **`clone()`**                 | 124,779    | 195,211    |            **V3**            | 1.56×  |
+| **`constructor()`**           | 41         | 40         | **Statistically Equivalent** | 1.03×  |
+| **`constructor(Collection)`** | 92,395     | 197,882    |            **V3**            | 2.14×  |
+| **`contains(Object)`**        | 37         | 100        |            **V3**            | 2.70×  |
+| **`containsAll(Collection)`** | 5,031      | 16,922     |            **V3**            | 3.36×  |
+| **`equals(Object)`**          | 243,488    | 452,081    |            **V3**            | 1.86×  |
+| **`hashCode()`**              | 49,486     | 64,098     |            **V3**            | 1.30×  |
+| **`isEmpty()`**               | 33         | 42         |            **V3**            | 1.27×  |
+| **`iterator()`**              | 61,863     | 100,736    |            **V3**            | 1.63×  |
+| **`remove(Object)`**          | 38         | 66         |            **V3**            | 1.74×  |
+| **`removeAll(Collection)`**   | 17,521     | 35,869     |            **V3**            | 2.05×  |
+| **`retainAll(Collection)`**   | 95,070,383 | 93,187,198 | **Statistically Equivalent** | 1.02×  |
+| **`size()`**                  | 33         | 38         |            **V3**            | 1.15×  |
+| **`toArray()`**               | 53,764     | 56,113     | **Statistically Equivalent** | 1.04×  |
+| **`toArray(T[])`**            | 64,664     | 65,604     | **Statistically Equivalent** | 1.01×  |
+| **`toString()`**              | 484,510    | 467,994    | **Statistically Equivalent** | 1.04×  |
 
 ## Performance Testing
 
@@ -144,11 +144,13 @@ All methods implemented are identical to those found in the Java [Set](https://d
 ![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/add.png)
 ![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/addAll.png)
 ![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/clear.png)
+![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/clone.png)
 ![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/contains.png)
 ![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/containsAll.png)
 ![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/equals.png)
 ![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/hashCode.png)
 ![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/isEmpty.png)
+![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/iterator.png)
 ![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/remove.png)
 ![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/removeAll.png)
 ![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/retainAll.png)
@@ -163,11 +165,13 @@ All methods implemented are identical to those found in the Java [Set](https://d
 ![Combined Performance Charts](PerformanceTesting/V3_JDK/add.png)
 ![Combined Performance Charts](PerformanceTesting/V3_JDK/addAll.png)
 ![Combined Performance Charts](PerformanceTesting/V3_JDK/clear.png)
+![Combined Performance Charts](PerformanceTesting/V3_JDK/clone.png)
 ![Combined Performance Charts](PerformanceTesting/V3_JDK/contains.png)
 ![Combined Performance Charts](PerformanceTesting/V3_JDK/containsAll.png)
 ![Combined Performance Charts](PerformanceTesting/V3_JDK/equals.png)
 ![Combined Performance Charts](PerformanceTesting/V3_JDK/hashCode.png)
 ![Combined Performance Charts](PerformanceTesting/V3_JDK/isEmpty.png)
+![Combined Performance Charts](PerformanceTesting/V3_JDK/iterator.png)
 ![Combined Performance Charts](PerformanceTesting/V3_JDK/remove.png)
 ![Combined Performance Charts](PerformanceTesting/V3_JDK/removeAll.png)
 ![Combined Performance Charts](PerformanceTesting/V3_JDK/retainAll.png)
@@ -182,11 +186,13 @@ All methods implemented are identical to those found in the Java [Set](https://d
 ![Combined Performance Charts](PerformanceTesting/V2_V3/add.png)
 ![Combined Performance Charts](PerformanceTesting/V2_V3/addAll.png)
 ![Combined Performance Charts](PerformanceTesting/V2_V3/clear.png)
+![Combined Performance Charts](PerformanceTesting/V2_V3/clone.png)
 ![Combined Performance Charts](PerformanceTesting/V2_V3/contains.png)
 ![Combined Performance Charts](PerformanceTesting/V2_V3/containsAll.png)
 ![Combined Performance Charts](PerformanceTesting/V2_V3/equals.png)
 ![Combined Performance Charts](PerformanceTesting/V2_V3/hashCode.png)
 ![Combined Performance Charts](PerformanceTesting/V2_V3/isEmpty.png)
+![Combined Performance Charts](PerformanceTesting/V2_V3/iterator.png)
 ![Combined Performance Charts](PerformanceTesting/V2_V3/remove.png)
 ![Combined Performance Charts](PerformanceTesting/V2_V3/removeAll.png)
 ![Combined Performance Charts](PerformanceTesting/V2_V3/retainAll.png)

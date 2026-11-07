@@ -89,6 +89,6 @@ for spine in ax.spines.values():
     spine.set_edgecolor('#555555')
 
 plt.tight_layout()
-plt.savefig('geometric.png', dpi=300, transparent=True)
+plt.savefig('geometric_v3_v2.png', dpi=300, transparent=True)
 plt.close()
 print("Geometric chart V3 vs V2 updated successfully!")

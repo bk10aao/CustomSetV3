@@ -23,7 +23,7 @@ FILES = {
     'V3': 'CustomSetV3_performance.csv',
 }
 
-OUTPUT_DIR = ""
+OUTPUT_DIR = "./V3_V2"
 
 COLORS = {
     'V2': '#9B6EF3',       # Neon Purple
