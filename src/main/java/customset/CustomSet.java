@@ -5,11 +5,12 @@ import java.io.InvalidObjectException;
 import java.io.ObjectInputStream;
 import java.io.Serial;
 import java.io.Serializable;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.Collection;
 import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
-import java.util.Objects;
 import java.util.Set;
 import java.util.Spliterator;
 import java.util.function.Consumer;
@@ -60,7 +61,7 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
     private static final int DEFAULT_INITIAL_CAPACITY = 16;
     private static final float DEFAULT_LOAD_FACTOR = 0.75f;
     private static final int HASH_BITS_TO_SHIFT = 16;
-    private static final int MAXIMUM_CAPACITY = 1_073_741_824;
+    private static final int MAXIMUM_CAPACITY = 1 << 30;
     private static final int MIN_TREEIFY_CAPACITY = 64;
     private static final int TREEIFY_THRESHOLD   = 8;
     private static final int UNTREEIFY_THRESHOLD = 6;
@@ -110,8 +111,9 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
      * @param c the collection whose elements are to be placed into this set
      * @throws NullPointerException if the specified collection is null
      */
-    public CustomSet(final Collection<E> c) {
-        this(Math.max((int) (c.size() / DEFAULT_LOAD_FACTOR) + 1, DEFAULT_INITIAL_CAPACITY), DEFAULT_LOAD_FACTOR);
+    public CustomSet(final Collection<? extends E> c) {
+        this(Math.max((int) (requireNonNull(c).size() / DEFAULT_LOAD_FACTOR) + 1, DEFAULT_INITIAL_CAPACITY),
+                DEFAULT_LOAD_FACTOR);
         addAll(c);
     }
 
@@ -151,7 +153,7 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
         if (c.isEmpty())
             return false;
         int initialSize = size;
-        ensureCapacity(c);
+        ensureCapacity(c.size());
         for (E e : c)
             add(e);
         return size > initialSize;
@@ -162,8 +164,20 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
      *
      * @return a shallow copy of this set
      */
+    @Override
     public CustomSet<E> clone() {
-        return new CustomSet<>(this);
+        try {
+            CustomSet<E> copy = (CustomSet<E>) super.clone();
+            copy.table = (Node<E>[]) new Node[table.length];
+            copy.size = 0;
+            copy.containsNull = false;
+            copy.modCount = 0;
+            copy.setThreshold(copy.table.length);
+            copy.addAll(this);
+            return copy;
+        } catch (CloneNotSupportedException e) {
+            throw new InternalError(e);
+        }
     }
 
     /**
@@ -217,8 +231,6 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
      */
     public boolean containsAll(final Collection<?> c) {
         requireNonNull(c, "Collection must not be null.");
-        if (c instanceof Set<?> && c.size() > size)
-            return false;
         for (Object e : c)
             if (!contains(e))
                 return false;
@@ -283,6 +295,8 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
     @Serial
     private void readObject(ObjectInputStream s) throws IOException, ClassNotFoundException {
         s.defaultReadObject();
+        if (loadFactor <= 0 || Float.isNaN(loadFactor) || Float.isInfinite(loadFactor))
+            throw new InvalidObjectException("Illegal load factor: " + loadFactor);
         int cap = s.readInt();
         if (cap < 0)
             throw new InvalidObjectException("Illegal capacity: " + cap);
@@ -389,10 +403,8 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
      *
      * @return an array containing all the elements in this set
      */
-    public E[] toArray() {
-        E[] arr = (E[]) new Object[size];
-        if (table == null || size == 0)
-            return arr;
+    public Object[] toArray() {
+        Object[] arr = new Object[size];
         int index = 0;
         if (containsNull)
             arr[index++] = null;
@@ -467,19 +479,63 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
         return true;
     }
 
-    private void ensureCapacity(Collection<? extends E> c) {
-        long requiredCapacity = (long) ((size + c.size()) / loadFactor) + 1;
-        if (requiredCapacity > MAXIMUM_CAPACITY)
-            requiredCapacity = MAXIMUM_CAPACITY;
-        int targetCapacity = tableSizeFor((int) requiredCapacity);
-        if (table == null || table.length < targetCapacity)
-            if (size == 0) {
-                int capacity = Math.max(targetCapacity, DEFAULT_INITIAL_CAPACITY);
-                this.table = (Node<E>[]) new Node[capacity];
-                setThreshold(capacity);
-            } else
-                while (table.length < targetCapacity && table.length < MAXIMUM_CAPACITY)
-                    expand();
+    private void ensureCapacity(final int additional) {
+        long required = (long)((size + (long) additional ) / (double) loadFactor) + 1;
+        int target = tableSizeFor((int)Math.min(required, MAXIMUM_CAPACITY));
+        if (target > table.length)
+            resize(target);
+    }
+
+    private void resize(final int newCapacity) {
+        Node<E>[] oldTable = table;
+        int oldCapacity = (oldTable == null) ? 0 : oldTable.length;
+        Node<E>[] newTable = (Node<E>[]) new Node[newCapacity];
+
+        table = newTable;
+        setThreshold(newCapacity);
+
+        if (oldTable != null && size > 0) {
+            for (int i = 0; i < oldCapacity; ++i) {
+                Node<E> entry = oldTable[i];
+                if (entry != null) {
+                    oldTable[i] = null;
+                    if (entry.next == null)
+                        newTable[entry.hash & (newCapacity - 1)] = entry;
+                    else if (entry instanceof TreeNode)
+                        ((TreeNode<E>) entry).split(newTable, i, oldCapacity);
+                    else {
+                        Node<E> lowHead = null, lowTail = null;
+                        Node<E> highHead = null, highTail = null;
+                        Node<E> nextEntry;
+                        do {
+                            nextEntry = entry.next;
+                            if ((entry.hash & oldCapacity) == 0) {
+                                if (lowTail == null)
+                                    lowHead = entry;
+                                else
+                                    lowTail.next = entry;
+                                lowTail = entry;
+                            } else {
+                                if (highTail == null)
+                                    highHead = entry;
+                                else
+                                    highTail.next = entry;
+                                highTail = entry;
+                            }
+                        } while ((entry = nextEntry) != null);
+
+                        if (lowTail != null) {
+                            lowTail.next = null;
+                            newTable[i] = lowHead;
+                        }
+                        if (highTail != null) {
+                            highTail.next = null;
+                            newTable[i + oldCapacity] = highHead;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private Node<E>[] expand() {
@@ -494,9 +550,8 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
             newCapacity = oldCapacity << 1;
             if (newCapacity > MAXIMUM_CAPACITY)
                 newCapacity = MAXIMUM_CAPACITY;
-        } else {
+        } else
             newCapacity = DEFAULT_INITIAL_CAPACITY;
-        }
         Node<E>[] newTable = (Node<E>[]) new Node[newCapacity];
         table = newTable;
         setThreshold(newCapacity);
@@ -530,7 +585,7 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
                 Node<E> nextNode = current.next;
                 if (nextNode == null) {
                     current.next = new Node<>(hash, e, null);
-                    if (binCount >= TREEIFY_THRESHOLD)
+                    if (binCount >= TREEIFY_THRESHOLD - 1)
                         treeifyBin(tab, index);
                     break;
                 }
@@ -577,7 +632,7 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
     }
 
     private boolean removeTreeNode(Object o, TreeNode<E> first, int hash, Node<E>[] tab) {
-        TreeNode<E> node = first.getTreeNode(hash, o);
+        TreeNode<E> node = (TreeNode<E>) first.getTreeNode(hash, o);
         if (node != null) {
             node.removeTreeNode(tab);
             size--;
@@ -689,18 +744,14 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
 
         private HashIterator() {
             expectedModCount = modCount;
-            current = next = null;
-            index = 0;
             includeNull = containsNull;
             Node<E>[] tab = table;
             if (tab != null && size > 0)
-                if (index < tab.length && (next = tab[index++]) == null)
-                    while (index < tab.length && (next = tab[index++]) == null) { }
+                while (index < tab.length && (next = tab[index++]) == null) { }
         }
 
         public boolean hasNext() {
-            checkForComodification();
-            return next != null;
+            return includeNull || next != null;
         }
 
         public E next() {
@@ -711,11 +762,13 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
                 current = null;
                 return null;
             }
-            Node<E>[] tab = table;
             Node<E> e = next;
             if (e == null)
                 throw new NoSuchElementException();
-            if ((next = (current = e).next) == null && tab != null)
+            removeNull = false;
+            current = e;
+            Node<E>[] tab = table;
+            if ((next = e.next) == null && tab != null)
                 while (index < tab.length && (next = tab[index++]) == null) { }
             return e.key;
         }
@@ -723,16 +776,14 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
         public void remove() {
             checkForComodification();
             if (removeNull) {
-                CustomSet.this.remove(null);
                 removeNull = false;
-                expectedModCount = modCount;
-                return;
-            }
-            if (current == null)
-                throw new IllegalArgumentException();
-            Object keyToRemove = current.key;
-            current = null;
-            CustomSet.this.remove(keyToRemove);
+                CustomSet.this.remove(null);
+            } else if (current != null) {
+                Object key = current.key;
+                current = null;
+                CustomSet.this.remove(key);
+            } else
+                throw new IllegalStateException();
             expectedModCount = modCount;
         }
 
@@ -793,7 +844,7 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
                     return root;
                 }
 
-                if ((parentLeftChild = parentNode.left) == fixupNode) {                     // x is left child
+                if ((parentLeftChild = parentNode.left) == fixupNode) {
                     if ((parentRightChild = parentNode.right) != null && parentRightChild.isRed) {
                         parentRightChild.isRed = false;
                         parentNode.isRed  = true;
@@ -828,7 +879,7 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
                             fixupNode = root;
                         }
                     }
-                } else {                                        // x is right child
+                } else {
                     if (parentLeftChild != null && parentLeftChild.isRed) {
                         parentLeftChild.isRed = false;
                         parentNode.isRed  = true;
@@ -882,7 +933,7 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
                     return currentNode;
                 } else if (!parentNode.isRed || (grandparentNode = parentNode.parent) == null)
                     return root;
-                if (parentNode == grandparentNode.left) {
+                if (parentNode == grandparentNode.left)
                     if ((grandparentRight = grandparentNode.right) != null && grandparentRight.isRed) {
                         grandparentRight.isRed = false;
                         parentNode.isRed = false;
@@ -902,7 +953,7 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
                         }
                         return root;
                     }
-                } else if ((grandparentLeft = grandparentNode.left) != null && grandparentLeft.isRed) {
+                else if ((grandparentLeft = grandparentNode.left) != null && grandparentLeft.isRed) {
                     grandparentLeft.isRed = false;
                     parentNode.isRed = false;
                     grandparentNode.isRed = true;
@@ -924,61 +975,63 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
             }
         }
 
-        /**
-         * Compares two keys for ordering purposes within the red-black tree, utilizing
-         * hash codes, {@link Comparable} implementation if available, and fallback identity hash codes.
-         *
-         * @param hash1 the hash of the first key
-         * @param hash2 the hash of the second key
-         * @param value1 the first key
-         * @param value2 the second key
-         * @return a negative integer, zero, or a positive integer as the first key is less than, equal to,
-         *          or greater than the second
-         */
-        private int compare(final int hash1, final int hash2, final E value1, final E value2) {
+        private static int compare(final int hash1, final int hash2, final Object v1, final Object v2) {
             if (hash1 != hash2)
                 return hash1 < hash2 ? -1 : 1;
-            if (value1 instanceof Comparable) {
-                int cmp = ((Comparable<? super E>) value1).compareTo(value2);
-                if (cmp != 0)
-                    return cmp;
-            }
-            return identityHashCode(value1) <= identityHashCode(value2) ? -1 : 1;
+            Class<?> kc = comparableClassFor(v1);
+            int cmp;
+            if (kc != null && (cmp = compareComparables(kc, v1, v2)) != 0)
+                return cmp;
+            return tieBreakOrder(v1, v2);
         }
 
-        /**
-         * Finds and returns the tree node matching the specified hash and key starting from this node.
-         *
-         * @param hash the hash value to look up
-         * @param target    the key object to look up
-         * @return the matching tree node, or {@code null} if not found
-         */
-        private TreeNode<E> find(final int hash, final Object target) {
+        private static Class<?> comparableClassFor(final Object x) {
+            if (x instanceof Comparable) {
+                Class<?> c = x.getClass();
+                if (c == String.class)
+                    return c;
+                for (Type t : c.getGenericInterfaces())
+                    if (t instanceof ParameterizedType p && p.getRawType() == Comparable.class) {
+                        Type[] args = p.getActualTypeArguments();
+                        if (args.length == 1 && args[0] == c)
+                            return c;
+                    }
+            }
+            return null;
+        }
+
+        private static int compareComparables(final Class<?> kc, final Object k, final Object x) {
+            return(x == null || x.getClass() != kc) ? 0 : ((Comparable)k).compareTo(x);
+        }
+
+        private TreeNode<E> find(final int hash, final Object target, Class<?> kc) {
             TreeNode<E> p = this;
             do {
-                int nodeHash = p.hash;
-                E nodeValue = p.key;
-                if (nodeHash > hash)
-                    p = p.left;
-                else if (nodeHash < hash)
-                    p = p.right;
-                else if (Objects.equals(target, nodeValue))
+                TreeNode<E> pl = p.left, pr = p.right, q;
+                int dir;
+                if (p.hash > hash)
+                    p = pl;
+                else if (p.hash < hash)
+                    p = pr;
+                else if (p.key == target || p.key.equals(target))
                     return p;
+                else if (pl == null)
+                    p = pr;
+                else if (pr == null)
+                    p = pl;
+                else if ((kc != null || (kc = comparableClassFor(target)) != null)
+                        && (dir = compareComparables(kc, target, p.key)) != 0)
+                    p = (dir < 0) ? pl : pr;
+                else if ((q = pr.find(hash, target, kc)) != null)
+                    return q;
                 else
-                    p = (compare(hash, nodeHash, (E) target, nodeValue) < 0) ? p.left : p.right;
+                    p = pl;
             } while (p != null);
             return null;
         }
 
-        /**
-         * Locates a tree node by hash and key, beginning at the root of the tree structure.
-         *
-         * @param hash the hash value to look up
-         * @param o    the key object to look up
-         * @return the matching tree node, or {@code null} if not found
-         */
-        private TreeNode<E> getTreeNode(final int hash, final Object o) {
-            return ((parent != null) ? root() : this).find(hash, o);
+        private TreeNode<?> getTreeNode(final int hash, final Object o) {
+            return((parent != null) ? root() : this).find(hash, o, null);
         }
 
         /**
@@ -1009,33 +1062,34 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
             }
         }
 
-        /**
-         * Inserts a new key-value mapping into the red-black tree structure.
-         *
-         * @param tab the hash table array
-         * @param hash   the hash value
-         * @param value   the value
-         * @return the existing node if the key is already present, or {@code null} if a new node was inserted
-         */
         private TreeNode<E> putTreeVal(final Node<E>[] tab, final int hash, final E value) {
+            Class<?> kc = null;
+            boolean searched = false;
             TreeNode<E> root = (parent != null) ? root() : this;
             for (TreeNode<E> p = root; ; ) {
-                int direction;
-                int nodeHash = p.hash;
-                E nodeValue = p.key;
-                if (nodeHash > hash)
-                    direction = -1;
-                else if (nodeHash < hash)
-                    direction = 1;
-                else if (nodeValue == value || (value.equals(nodeValue)))
+                int dir;
+                if (p.hash > hash)
+                    dir = -1;
+                else if (p.hash < hash)
+                    dir = 1;
+                else if (p.key == value || value.equals(p.key))
                     return p;
-                else
-                    direction = compare(hash, nodeHash, value, nodeValue);
+                else if ((kc == null && (kc = comparableClassFor(value)) == null)
+                        || (dir = compareComparables(kc, value, p.key)) == 0) {
+                    if (!searched) {
+                        TreeNode<E> q, ch;
+                        searched = true;
+                        if (((ch = p.left) != null && (q = ch.find(hash, value, kc)) != null)
+                                || ((ch = p.right) != null && (q = ch.find(hash, value, kc)) != null))
+                            return q;
+                    }
+                    dir = tieBreakOrder(value, p.key);
+                }
                 TreeNode<E> parentOfNewNode = p;
-                if ((p = (direction <= 0) ? p.left : p.right) == null) {
+                if ((p = (dir <= 0) ? p.left : p.right) == null) {
                     Node<E> nextAfterInsertion = parentOfNewNode.next;
                     TreeNode<E> newNode = new TreeNode<>(hash, value, nextAfterInsertion);
-                    if (direction <= 0)
+                    if (dir <= 0)
                         parentOfNewNode.left = newNode;
                     else
                         parentOfNewNode.right = newNode;
@@ -1159,13 +1213,8 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
          */
         private TreeNode<E> root() {
             TreeNode<E> r = this;
-            int guard = 0;
-            while (r.parent != null) {
+            while (r.parent != null)
                 r = r.parent;
-                if (++guard > 64) {
-                    throw new IllegalStateException("Cycle detected in parent links (root())");
-                }
-            }
             return r;
         }
 
@@ -1267,6 +1316,15 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
                 }
         }
 
+        private static int tieBreakOrder(final Object a, final Object b) {
+            int d;
+            if (a == null || b == null || (d = a.getClass().getName().compareTo(b.getClass().getName())) == 0)
+                d = identityHashCode(a) <= identityHashCode(b) ? -1 : 1;
+            return d;
+        }
+
+
+
         /**
          * Forms a balanced red-black tree out of the linked list nodes starting from this node.
          *
@@ -1344,7 +1402,7 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
         }
 
         public int characteristics() {
-            return Spliterator.DISTINCT | Spliterator.SIZED | Spliterator.SUBSIZED;
+            return (fence < 0 || estimatedSize == set.size ? Spliterator.SIZED : 0) | Spliterator.DISTINCT;
         }
 
         public long estimateSize() {
@@ -1355,106 +1413,76 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
         public void forEachRemaining(final Consumer<? super E> action) {
             requireNonNull(action);
             checkForComodification();
-            if(includeNull) {
+            if (includeNull) {
                 includeNull = false;
                 action.accept(null);
             }
             Node<E>[] tab = table;
-            if(tab == null) {
+            if (tab == null) {
                 getFence();
                 tab = table;
             }
             int high = getFence();
-            Node<E> node = current;
-            while(node != null) {
+            for (Node<E> node = current; node != null; node = node.next)
                 action.accept(node.key);
-                node = node.next;
-            }
             current = null;
-            for(int i = index; i < high; i++)
+            for (int i = index; i < high; i++)
                 for (Node<E> n = tab[i]; n != null; n = n.next)
                     action.accept(n.key);
             index = high;
             estimatedSize = 0;
+            checkForComodification();
         }
 
         public boolean tryAdvance(final Consumer<? super E> action) {
             requireNonNull(action);
             checkForComodification();
-            if(includeNull) {
+            if (includeNull) {
                 includeNull = false;
                 action.accept(null);
-                if(estimatedSize > 0)
+                if (estimatedSize > 0)
                     estimatedSize--;
                 return true;
             }
             Node<E>[] tab = table;
-            if(tab == null) {
+            if (tab == null) {
                 getFence();
                 tab = table;
             }
             int higherIndex = getFence();
-            while(true) {
-                if(current != null) {
+            while (true) {
+                if (current != null) {
                     E e = current.key;
                     current = current.next;
                     action.accept(e);
-                    if(estimatedSize > 0)
+                    if (estimatedSize > 0)
                         estimatedSize--;
                     return true;
                 }
-                if(index >= higherIndex)
+                if (index >= higherIndex)
                     return false;
                 current = tab[index++];
             }
         }
 
         public Spliterator<E> trySplit() {
-            int highIndex = getFence();
-            int lowIndex = index;
-            long estimatedSize = this.estimatedSize;
-            if(includeNull || estimatedSize <= 1 || lowIndex >= highIndex)
+            int high = getFence(), low = index, mid = (low + high) >>> 1;
+            if (estimatedSize <= 1 || low >= mid || current != null)
                 return null;
-            int mid = (lowIndex + highIndex) >>> 1;
-            if(mid > lowIndex) {
-                long newEst = estimatedSize >>> 1;
-                index = mid;
-                this.estimatedSize = estimatedSize - newEst;
-                return new CustomSetSpliterator<>(set, lowIndex, mid, newEst, expectedModCount, false);
-            }
-            if(current != null || table != null && table[lowIndex] != null) {
-                Node<E> first = current != null ? current : table[lowIndex];
-                if(first == null)
-                    return null;
-                int chainSize = 0;
-                for(Node<E> node = first; node != null && chainSize < DEFAULT_INITIAL_CAPACITY; node = node.next)
-                    chainSize++;
-                if(chainSize >= 4) {
-                    int steps = chainSize >>> 1;
-                    Node<E> splitPoint = first;
-                    for(int i = 0; i < steps && splitPoint.next != null; i++)
-                        splitPoint = splitPoint.next;
-                    Node<E> newCurrent = splitPoint.next;
-                    CustomSetSpliterator<E> left = new CustomSetSpliterator<>(set, lowIndex, lowIndex + 1, steps,
-                                                                                expectedModCount, false);
-                    left.current = first;
-                    left.table = table;
-                    this.current = newCurrent;
-                    this.estimatedSize = estimatedSize - steps;
-                    return left;
-                }
-            }
-            return null;
+            long half = estimatedSize >>> 1;
+            estimatedSize -= half;
+            index = mid;
+            return new CustomSetSpliterator<>(set, low, mid, half, expectedModCount, false);
         }
 
         private void checkForComodification() {
-            if(set.modCount != expectedModCount)
+            if (set.modCount != expectedModCount)
                 throw new ConcurrentModificationException();
         }
 
         private int getFence() {
             int higherIndex;
-            if((higherIndex = fence) < 0) {
+            if ((higherIndex = fence) < 0) {
                 table = set.table;
                 estimatedSize = set.size;
                 expectedModCount = set.modCount;

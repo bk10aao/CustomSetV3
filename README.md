@@ -77,49 +77,49 @@ All methods implemented are identical to those found in the Java [Set](https://d
 
 | Method                        | V3 (ns)    | JDK (ns)   |            Winner            | Margin |
 |:------------------------------|:-----------|:-----------|:----------------------------:|:------:|
-| **`add(E)`**                  | 146,366    | 234,506    |            **V3**            | 1.60×  |
-| **`addAll(Collection)`**      | 92,164     | 247,432    |            **V3**            | 2.68×  |
-| **`clear()`**                 | 13,564     | 14,886     | **Statistically Equivalent** | 1.10×  |
-| **`clone()`**                 | 124,779    | 237,006    |            **V3**            | 1.90×  |
+| **`add(E)`**                  | 152,784    | 229,506    |            **V3**            | 1.50×  |
+| **`addAll(Collection)`**      | 94,672     | 264,354    |            **V3**            | 2.79×  |
+| **`clear()`**                 | 13,816     | 14,886     | **Statistically Equivalent** | 1.08×  |
+| **`clone()`**                 | 124,652    | 227,002    |            **V3**            | 1.82×  |
 | **`constructor()`**           | 41         | 49         |            **V3**            | 1.20×  |
-| **`constructor(Collection)`** | 92,395     | 191,957    |            **V3**            | 2.08×  |
-| **`contains(Object)`**        | 37         | 66         |            **V3**            | 1.78×  |
-| **`containsAll(Collection)`** | 5,031      | 16,117     |            **V3**            | 3.20×  |
-| **`equals(Object)`**          | 243,488    | 835,394    |            **V3**            | 3.43×  |
-| **`hashCode()`**              | 49,486     | 146,478    |            **V3**            | 2.96×  |
-| **`isEmpty()`**               | 33         | 63         |            **V3**            | 1.91×  |
-| **`iterator()`**              | 61,863     | 176,145    |            **V3**            | 2.85×  |
-| **`remove(Object)`**          | 38         | 113        |            **V3**            | 2.97×  |
-| **`removeAll(Collection)`**   | 17,521     | 39,788     |            **V3**            | 2.27×  |
-| **`retainAll(Collection)`**   | 95,070,383 | 95,849,271 | **Statistically Equivalent** | 1.01×  |
-| **`size()`**                  | 33         | 41         |            **V3**            | 1.24×  |
-| **`toArray()`**               | 53,764     | 60,653     | **Statistically Equivalent** | 1.13×  |
-| **`toArray(T[])`**            | 64,664     | 86,634     |            **V3**            | 1.34×  |
-| **`toString()`**              | 484,510    | 488,435    | **Statistically Equivalent** | 1.01×  |
+| **`constructor(Collection)`** | 94,270     | 198,857    |            **V3**            | 2.11×  |
+| **`contains(Object)`**        | 47         | 66         |            **V3**            | 1.40×  |
+| **`containsAll(Collection)`** | 5,168      | 15,828     |            **V3**            | 3.06×  |
+| **`equals(Object)`**          | 252,115    | 693,257    |            **V3**            | 2.75×  |
+| **`hashCode()`**              | 50,519     | 140,641    |            **V3**            | 2.78×  |
+| **`isEmpty()`**               | 34         | 71         |            **V3**            | 2.09×  |
+| **`iterator()`**              | 62,114     | 181,739    |            **V3**            | 2.93×  |
+| **`remove(Object)`**          | 42         | 118        |            **V3**            | 2.81×  |
+| **`removeAll(Collection)`**   | 18,037     | 39,977     |            **V3**            | 2.22×  |
+| **`retainAll(Collection)`**   | 91,893,930 | 93,672,223 | **Statistically Equivalent** | 1.02×  |
+| **`size()`**                  | 42         | 40         | **Statistically Equivalent** | 1.05×  |
+| **`toArray()`**               | 55,719     | 61,206     |            **V3**            | 1.10×  |
+| **`toArray(T[])`**            | 66,061     | 86,787     |            **V3**            | 1.31×  |
+| **`toString()`**              | 485,781    | 482,031    | **Statistically Equivalent** | 1.01×  |
 
 ### V3 vs V2
 
 | Method                        | V3 (ns)    | V2 (ns)    |            Winner            | Margin |
 |:------------------------------|:-----------|:-----------|:----------------------------:|:------:|
-| **`add(E)`**                  | 146,366    | 233,182    |            **V3**            | 1.59×  |
-| **`addAll(Collection)`**      | 92,164     | 255,128    |            **V3**            | 2.77×  |
-| **`clear()`**                 | 13,564     | 13,735     | **Statistically Equivalent** | 1.01×  |
-| **`clone()`**                 | 124,779    | 195,211    |            **V3**            | 1.56×  |
-| **`constructor()`**           | 41         | 40         | **Statistically Equivalent** | 1.03×  |
-| **`constructor(Collection)`** | 92,395     | 197,882    |            **V3**            | 2.14×  |
-| **`contains(Object)`**        | 37         | 100        |            **V3**            | 2.70×  |
-| **`containsAll(Collection)`** | 5,031      | 16,922     |            **V3**            | 3.36×  |
-| **`equals(Object)`**          | 243,488    | 452,081    |            **V3**            | 1.86×  |
-| **`hashCode()`**              | 49,486     | 64,098     |            **V3**            | 1.30×  |
-| **`isEmpty()`**               | 33         | 42         |            **V3**            | 1.27×  |
-| **`iterator()`**              | 61,863     | 100,736    |            **V3**            | 1.63×  |
-| **`remove(Object)`**          | 38         | 66         |            **V3**            | 1.74×  |
-| **`removeAll(Collection)`**   | 17,521     | 35,869     |            **V3**            | 2.05×  |
-| **`retainAll(Collection)`**   | 95,070,383 | 93,187,198 | **Statistically Equivalent** | 1.02×  |
-| **`size()`**                  | 33         | 38         |            **V3**            | 1.15×  |
-| **`toArray()`**               | 53,764     | 56,113     | **Statistically Equivalent** | 1.04×  |
-| **`toArray(T[])`**            | 64,664     | 65,604     | **Statistically Equivalent** | 1.01×  |
-| **`toString()`**              | 484,510    | 467,994    | **Statistically Equivalent** | 1.04×  |
+| **`add(E)`**                  | 152,784    | 233,182    |            **V3**            | 1.53×  |
+| **`addAll(Collection)`**      | 94,672     | 255,128    |            **V3**            | 2.69×  |
+| **`clear()`**                 | 13,816     | 13,735     | **Statistically Equivalent** | 1.01×  |
+| **`clone()`**                 | 124,652    | 195,211    |            **V3**            | 1.57×  |
+| **`constructor()`**           | 41         | 40         | **Statistically Equivalent** | 1.02×  |
+| **`constructor(Collection)`** | 94,270     | 197,882    |            **V3**            | 2.10×  |
+| **`contains(Object)`**        | 47         | 100        |            **V3**            | 2.13×  |
+| **`containsAll(Collection)`** | 5,168      | 16,922     |            **V3**            | 3.27×  |
+| **`equals(Object)`**          | 252,115    | 452,081    |            **V3**            | 1.79×  |
+| **`hashCode()`**              | 50,519     | 64,098     |            **V3**            | 1.27×  |
+| **`isEmpty()`**               | 34         | 42         |            **V3**            | 1.24×  |
+| **`iterator()`**              | 62,114     | 100,736    |            **V3**            | 1.62×  |
+| **`remove(Object)`**          | 42         | 66         |            **V3**            | 1.57×  |
+| **`removeAll(Collection)`**   | 18,037     | 35,869     |            **V3**            | 1.99×  |
+| **`retainAll(Collection)`**   | 91,893,930 | 93,187,198 | **Statistically Equivalent** | 1.01×  |
+| **`size()`**                  | 42         | 38         | **Statistically Equivalent** | 1.11×  |
+| **`toArray()`**               | 55,719     | 56,113     | **Statistically Equivalent** | 1.01×  |
+| **`toArray(T[])`**            | 66,061     | 65,604     | **Statistically Equivalent** | 1.01×  |
+| **`toString()`**              | 485,781    | 467,994    | **Statistically Equivalent** | 1.04×  |
 
 ## Performance Testing
 

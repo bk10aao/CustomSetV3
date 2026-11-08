@@ -26,8 +26,7 @@ FILES = {
     'JDK': 'HashSet_performance.csv',
 }
 
-OUTPUT_DIR = ""
-
+OUTPUT_DIR = "V1_V2_V3_JDK"
 COLORS = {
     'V1': '#2ECFBF',       # Neon Teal
     'V2': '#9B6EF3',       # Neon Purple

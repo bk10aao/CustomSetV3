@@ -646,7 +646,8 @@ public class CustomSetTest {
 
         assertTrue((characteristics & Spliterator.DISTINCT) != 0);
         assertTrue((characteristics & Spliterator.SIZED) != 0);
-        assertTrue((characteristics & Spliterator.SUBSIZED) != 0);
+        // SUBSIZED is deliberately not reported: trySplit halves the estimate, so child sizes are approximate
+        assertEquals(0, characteristics & Spliterator.SUBSIZED);
     }
 
     @Test
@@ -802,7 +803,7 @@ public class CustomSetTest {
     }
 
     @Test
-    void spliterator_trySplit_intraChain_forcesExecution() {
+    void spliterator_trySplit_neverSplitsInsideASingleBucket() {
         class CollidingKey implements Comparable<CollidingKey> {
             private final String name;
             CollidingKey(String name) { this.name = name; }
@@ -810,31 +811,44 @@ public class CustomSetTest {
             @Override public boolean equals(Object o) {
                 return o instanceof CollidingKey && ((CollidingKey) o).name.equals(name);
             }
-            @Override public int compareTo(CollidingKey o) {
-                return name.compareTo(o.name);
-            }
+            @Override public int compareTo(CollidingKey o) { return name.compareTo(o.name); }
         }
 
         CustomSet<CollidingKey> set = new CustomSet<>(16);
-        set.add(new CollidingKey("A"));
-        set.add(new CollidingKey("B"));
-        set.add(new CollidingKey("C"));
-        set.add(new CollidingKey("D"));
-        set.add(new CollidingKey("E"));
+        for (String n : List.of("A", "B", "C", "D", "E"))
+            set.add(new CollidingKey(n));
 
         CustomSetSpliterator<CollidingKey> spliterator =
                 new CustomSetSpliterator<>(set, 0, 1, 5, set.size(), false);
-        spliterator.estimateSize();
 
-        Spliterator<CollidingKey> splitPart = spliterator.trySplit();
+        assertNull(spliterator.trySplit(), "A single bucket is never split (same as the JDK's HashMap spliterators)");
 
-        assertNotNull(splitPart, "Intra-chain split should trigger when chainSize >= 4 in a single bucket");
+        List<CollidingKey> seen = new ArrayList<>();          // a List, so duplicates would be caught
+        spliterator.forEachRemaining(seen::add);
+        assertEquals(5, seen.size());
+    }
 
-        Set<CollidingKey> collected = new HashSet<>();
-        splitPart.forEachRemaining(collected::add);
-        spliterator.forEachRemaining(collected::add);
+    @Test
+    void spliterator_trySplit_visitsEveryElementExactlyOnce() {
+        CustomSet<Integer> set = createDynamicSet(1000);
+        set.add(null);
 
-        assertEquals(5, collected.size());
+        List<Spliterator<Integer>> parts = new ArrayList<>();
+        parts.add(set.spliterator());
+        for (int round = 0; round < 4; round++)
+            for (Spliterator<Integer> sp : new ArrayList<>(parts)) {
+                Spliterator<Integer> half = sp.trySplit();
+                if (half != null)
+                    parts.add(half);
+            }
+
+        List<Integer> seen = new ArrayList<>();               // a List, so duplicates would be caught
+        for (Spliterator<Integer> sp : parts)
+            sp.forEachRemaining(seen::add);
+
+        assertTrue(parts.size() > 1, "expected the set to actually be split");
+        assertEquals(set.size(), seen.size());
+        assertEquals(set.size(), new HashSet<>(seen).size());
     }
 
     @Test
