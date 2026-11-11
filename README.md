@@ -73,54 +73,90 @@ All methods implemented are identical to those found in the Java [Set](https://d
 
 ## Performance
 
-### V3 vs JDK
+### V3 vs JDK HashSet
 
-| Method                        | V3 (ns)    | JDK (ns)   |            Winner            | Margin |
-|:------------------------------|:-----------|:-----------|:----------------------------:|:------:|
-| **`add(E)`**                  | 152,784    | 229,506    |            **V3**            | 1.50×  |
-| **`addAll(Collection)`**      | 94,672     | 264,354    |            **V3**            | 2.79×  |
-| **`clear()`**                 | 13,816     | 14,886     | **Statistically Equivalent** | 1.08×  |
-| **`clone()`**                 | 124,652    | 227,002    |            **V3**            | 1.82×  |
-| **`constructor()`**           | 41         | 49         |            **V3**            | 1.20×  |
-| **`constructor(Collection)`** | 94,270     | 198,857    |            **V3**            | 2.11×  |
-| **`contains(Object)`**        | 47         | 66         |            **V3**            | 1.40×  |
-| **`containsAll(Collection)`** | 5,168      | 15,828     |            **V3**            | 3.06×  |
-| **`equals(Object)`**          | 252,115    | 693,257    |            **V3**            | 2.75×  |
-| **`hashCode()`**              | 50,519     | 140,641    |            **V3**            | 2.78×  |
-| **`isEmpty()`**               | 34         | 71         |            **V3**            | 2.09×  |
-| **`iterator()`**              | 62,114     | 181,739    |            **V3**            | 2.93×  |
-| **`remove(Object)`**          | 42         | 118        |            **V3**            | 2.81×  |
-| **`removeAll(Collection)`**   | 18,037     | 39,977     |            **V3**            | 2.22×  |
-| **`retainAll(Collection)`**   | 91,893,930 | 93,672,223 | **Statistically Equivalent** | 1.02×  |
-| **`size()`**                  | 42         | 40         | **Statistically Equivalent** | 1.05×  |
-| **`toArray()`**               | 55,719     | 61,206     |            **V3**            | 1.10×  |
-| **`toArray(T[])`**            | 66,061     | 86,787     |            **V3**            | 1.31×  |
-| **`toString()`**              | 485,781    | 482,031    | **Statistically Equivalent** | 1.01×  |
+| Method                         |   V3 (ns)   | JDK HashSet (ns) |            Winner            | Margin |
+|:-------------------------------|:-----------:|:----------------:|:----------------------------:|:------:|
+| **`add(E)`**                   |   866,325   |    1,103,464     |            **V3**            | 1.27×  |
+| **`addAll(Collection)`**       |   581,141   |     936,890      |            **V3**            | 1.61×  |
+| **`clear()`**                  |   314,558   |     497,317      |            **V3**            | 1.58×  |
+| **`clone()`**                  |   628,457   |     833,011      |            **V3**            | 1.33×  |
+| **`constructor()`**            |    1.60     |       3.01       |            **V3**            | 1.88×  |
+| **`constructor(Collection)`**  |   624,257   |     814,089      |            **V3**            | 1.30×  |
+| **`constructor(int)`**         |    1.84     |       3.15       |            **V3**            | 1.71×  |
+| **`constructor(int, double)`** |    1.84     |       3.15       |            **V3**            | 1.71×  |
+| **`contains(Object)`**         |    2.25     |       2.22       | **Statistically Equivalent** | 1.01×  |
+| **`containsAll(Collection)`**  |    8,451    |      26,374      |            **V3**            | 3.12×  |
+| **`equals(Object)`**           |  1,095,450  |    1,483,152     |            **V3**            | 1.35×  |
+| **`hashCode()`**               |   97,727    |     208,277      |            **V3**            | 2.13×  |
+| **`isEmpty()`**                |    0.54     |       0.64       |            **V3**            | 1.19×  |
+| **`iterator()`**               |   117,276   |     208,537      |            **V3**            | 1.78×  |
+| **`remove(Object)`**           |   638,211   |     778,885      |            **V3**            | 1.22×  |
+| **`removeAll(Collection)`**    |   654,625   |     815,236      |            **V3**            | 1.25×  |
+| **`retainAll(Collection)`**    | 341,450,016 |   343,015,587    | **Statistically Equivalent** | 1.00×  |
+| **`size()`**                   |    0.54     |       0.64       |            **V3**            | 1.18×  |
+| **`spliterator()`**            |   142,612   |     131,726      | **Statistically Equivalent** | 1.08×  |
+| **`toArray()`**                |   120,236   |     123,778      | **Statistically Equivalent** | 1.03×  |
+| **`toArray(T[])`**             |   140,018   |     136,907      | **Statistically Equivalent** | 1.02×  |
+| **`toString()`**               |   860,517   |     903,591      | **Statistically Equivalent** | 1.05×  |
+
+---
 
 ### V3 vs V2
 
-| Method                        | V3 (ns)    | V2 (ns)    |            Winner            | Margin |
-|:------------------------------|:-----------|:-----------|:----------------------------:|:------:|
-| **`add(E)`**                  | 152,784    | 233,182    |            **V3**            | 1.53×  |
-| **`addAll(Collection)`**      | 94,672     | 255,128    |            **V3**            | 2.69×  |
-| **`clear()`**                 | 13,816     | 13,735     | **Statistically Equivalent** | 1.01×  |
-| **`clone()`**                 | 124,652    | 195,211    |            **V3**            | 1.57×  |
-| **`constructor()`**           | 41         | 40         | **Statistically Equivalent** | 1.02×  |
-| **`constructor(Collection)`** | 94,270     | 197,882    |            **V3**            | 2.10×  |
-| **`contains(Object)`**        | 47         | 100        |            **V3**            | 2.13×  |
-| **`containsAll(Collection)`** | 5,168      | 16,922     |            **V3**            | 3.27×  |
-| **`equals(Object)`**          | 252,115    | 452,081    |            **V3**            | 1.79×  |
-| **`hashCode()`**              | 50,519     | 64,098     |            **V3**            | 1.27×  |
-| **`isEmpty()`**               | 34         | 42         |            **V3**            | 1.24×  |
-| **`iterator()`**              | 62,114     | 100,736    |            **V3**            | 1.62×  |
-| **`remove(Object)`**          | 42         | 66         |            **V3**            | 1.57×  |
-| **`removeAll(Collection)`**   | 18,037     | 35,869     |            **V3**            | 1.99×  |
-| **`retainAll(Collection)`**   | 91,893,930 | 93,187,198 | **Statistically Equivalent** | 1.01×  |
-| **`size()`**                  | 42         | 38         | **Statistically Equivalent** | 1.11×  |
-| **`toArray()`**               | 55,719     | 56,113     | **Statistically Equivalent** | 1.01×  |
-| **`toArray(T[])`**            | 66,061     | 65,604     | **Statistically Equivalent** | 1.01×  |
-| **`toString()`**              | 485,781    | 467,994    | **Statistically Equivalent** | 1.04×  |
+| Method                         |   V3 (ns)   |  V2 (ns)   |            Winner            |   Margin    |
+|:-------------------------------|:-----------:|:----------:|:----------------------------:|:-----------:|
+| **`add(E)`**                   |   866,325   | 1,070,281  |            **V3**            |    1.24×    |
+| **`addAll(Collection)`**       |   581,141   |  910,499   |            **V3**            |    1.57×    |
+| **`clear()`**                  |   314,558   |    2.07    |            **V2**            | 151,935.26× |
+| **`clone()`**                  |   628,457   |  380,860   |            **V2**            |    1.65×    |
+| **`constructor()`**            |    1.60     |    3.02    |            **V3**            |    1.88×    |
+| **`constructor(Collection)`**  |   624,257   |  822,653   |            **V3**            |    1.32×    |
+| **`constructor(int)`**         |    1.84     |    3.16    |            **V3**            |    1.71×    |
+| **`constructor(int, double)`** |    1.84     |    3.21    |            **V3**            |    1.74×    |
+| **`contains(Object)`**         |    2.25     |    2.39    |            **V3**            |    1.07×    |
+| **`containsAll(Collection)`**  |    8,451    |   27,014   |            **V3**            |    3.20×    |
+| **`equals(Object)`**           |  1,095,450  | 1,517,248  |            **V3**            |    1.39×    |
+| **`hashCode()`**               |   97,727    |  105,126   | **Statistically Equivalent** |    1.08×    |
+| **`isEmpty()`**                |    0.54     |    0.74    |            **V3**            |    1.38×    |
+| **`iterator()`**               |   117,276   |  209,272   |            **V3**            |    1.78×    |
+| **`remove(Object)`**           |   638,211   |  379,697   |            **V2**            |    1.68×    |
+| **`removeAll(Collection)`**    |   654,625   |  349,324   |            **V2**            |    1.87×    |
+| **`retainAll(Collection)`**    | 341,450,016 | 38,383,333 |            **V2**            |    8.90×    |
+| **`size()`**                   |    0.54     |    0.74    |            **V3**            |    1.37×    |
+| **`spliterator()`**            |   142,612   |  131,245   | **Statistically Equivalent** |    1.09×    |
+| **`toArray()`**                |   120,236   |  124,008   | **Statistically Equivalent** |    1.03×    |
+| **`toArray(T[])`**             |   140,018   |  133,199   | **Statistically Equivalent** |    1.05×    |
+| **`toString()`**               |   860,517   | 1,065,356  |            **V3**            |    1.24×    |
 
+---
+
+### V3 vs V1
+
+| Method                         |   V3 (ns)   |   V1 (ns)   |            Winner            |  Margin   |
+|:-------------------------------|:-----------:|:-----------:|:----------------------------:|:---------:|
+| **`add(E)`**                   |   866,325   |  2,615,281  |            **V3**            |   3.02×   |
+| **`addAll(Collection)`**       |   581,141   |  2,776,303  |            **V3**            |   4.78×   |
+| **`clear()`**                  |   314,558   |   692,785   |            **V3**            |   2.20×   |
+| **`clone()`**                  |   628,457   |   698,006   |            **V3**            |   1.11×   |
+| **`constructor()`**            |    1.60     |    4.50     |            **V3**            |   2.81×   |
+| **`constructor(Collection)`**  |   624,257   |   457,421   |            **V3**            |   1.36×   |
+| **`constructor(int)`**         |    1.84     |    2,847    |            **V3**            | 1,543.38× |
+| **`constructor(int, double)`** |    1.84     |    2,847    |            **V3**            | 1,545.00× |
+| **`contains(Object)`**         |    2.25     |    2.12     | **Statistically Equivalent** |   1.06×   |
+| **`containsAll(Collection)`**  |    8,451    |    9,937    |            **V3**            |   1.18×   |
+| **`equals(Object)`**           |  1,095,450  |  3,197,317  |            **V3**            |   2.92×   |
+| **`hashCode()`**               |   97,727    |   134,003   |            **V3**            |   1.37×   |
+| **`isEmpty()`**                |    0.54     |    0.54     | **Statistically Equivalent** |   1.00×   |
+| **`iterator()`**               |   117,276   |   288,993   |            **V3**            |   2.46×   |
+| **`remove(Object)`**           |   638,211   |   713,294   |            **V3**            |   1.12×   |
+| **`removeAll(Collection)`**    |   654,625   |   747,767   |            **V3**            |   1.14×   |
+| **`retainAll(Collection)`**    | 341,450,016 | 347,300,706 | **Statistically Equivalent** |   1.02×   |
+| **`size()`**                   |    0.54     |    0.54     | **Statistically Equivalent** |   1.00×   |
+| **`spliterator()`**            |   142,612   |   151,917   | **Statistically Equivalent** |   1.07×   |
+| **`toArray()`**                |   120,236   |   167,134   |            **V3**            |   1.39×   |
+| **`toArray(T[])`**             |   140,018   |   176,093   |            **V3**            |   1.26×   |
+| **`toString()`**               |   860,517   |   950,141   | **Statistically Equivalent** |   1.10×   |
 ## Performance Testing
 
 <b>Note: The following performance charts are designed to be viewed in dark mode.</b>
@@ -128,6 +164,7 @@ All methods implemented are identical to those found in the Java [Set](https://d
 ### Heat Maps
 ![Heatmap](PerformanceTesting/V3_JDK/heatmap.png)
 ![Heatmap](PerformanceTesting/V2_V3/heatmap.png)
+![Heatmap](PerformanceTesting/V1_V3/heatmap.png)
 
 ### Geometric
 ![Geometric](PerformanceTesting/V3_JDK/geometric.png)
@@ -140,9 +177,14 @@ All methods implemented are identical to those found in the Java [Set](https://d
 ### V3 vs V2
 ![Combined Performance Charts](PerformanceTesting/V2_V3/grid.png)
 
+### V3 vs V1
+![Combined Performance Charts](PerformanceTesting/V1_V3/grid.png)
+
 ## Individual Graphs
 ### V1 vs V2 vs V3 vs JDK Performance
 ![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/constructor.png)
+![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/constructorCapacity.png)
+![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/constructorCapacityLoadFactor.png)
 ![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/constructorCollection.png)
 ![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/add.png)
 ![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/addAll.png)
@@ -154,6 +196,7 @@ All methods implemented are identical to those found in the Java [Set](https://d
 ![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/hashCode.png)
 ![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/isEmpty.png)
 ![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/iterator.png)
+![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/spliterator.png)
 ![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/remove.png)
 ![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/removeAll.png)
 ![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/retainAll.png)
@@ -164,6 +207,8 @@ All methods implemented are identical to those found in the Java [Set](https://d
 
 ### V3 vs JDK Performance
 ![Combined Performance Charts](PerformanceTesting/V3_JDK/constructor.png)
+![Combined Performance Charts](PerformanceTesting/V3_JDK/constructorCapacity.png)
+![Combined Performance Charts](PerformanceTesting/V3_JDK/constructorCapacityLoadFactor.png)
 ![Combined Performance Charts](PerformanceTesting/V3_JDK/constructorCollection.png)
 ![Combined Performance Charts](PerformanceTesting/V3_JDK/add.png)
 ![Combined Performance Charts](PerformanceTesting/V3_JDK/addAll.png)
@@ -175,6 +220,7 @@ All methods implemented are identical to those found in the Java [Set](https://d
 ![Combined Performance Charts](PerformanceTesting/V3_JDK/hashCode.png)
 ![Combined Performance Charts](PerformanceTesting/V3_JDK/isEmpty.png)
 ![Combined Performance Charts](PerformanceTesting/V3_JDK/iterator.png)
+![Combined Performance Charts](PerformanceTesting/V3_JDK/spliterator.png)
 ![Combined Performance Charts](PerformanceTesting/V3_JDK/remove.png)
 ![Combined Performance Charts](PerformanceTesting/V3_JDK/removeAll.png)
 ![Combined Performance Charts](PerformanceTesting/V3_JDK/retainAll.png)
@@ -185,6 +231,8 @@ All methods implemented are identical to those found in the Java [Set](https://d
 
 ### V3 vs V2 Performance
 ![Combined Performance Charts](PerformanceTesting/V2_V3/constructor.png)
+![Combined Performance Charts](PerformanceTesting/V2_V3/constructorCapacity.png)
+![Combined Performance Charts](PerformanceTesting/V2_V3/constructorCapacityLoadFactor.png)
 ![Combined Performance Charts](PerformanceTesting/V2_V3/constructorCollection.png)
 ![Combined Performance Charts](PerformanceTesting/V2_V3/add.png)
 ![Combined Performance Charts](PerformanceTesting/V2_V3/addAll.png)
@@ -196,6 +244,7 @@ All methods implemented are identical to those found in the Java [Set](https://d
 ![Combined Performance Charts](PerformanceTesting/V2_V3/hashCode.png)
 ![Combined Performance Charts](PerformanceTesting/V2_V3/isEmpty.png)
 ![Combined Performance Charts](PerformanceTesting/V2_V3/iterator.png)
+![Combined Performance Charts](PerformanceTesting/V2_V3/spliterator.png)
 ![Combined Performance Charts](PerformanceTesting/V2_V3/remove.png)
 ![Combined Performance Charts](PerformanceTesting/V2_V3/removeAll.png)
 ![Combined Performance Charts](PerformanceTesting/V2_V3/retainAll.png)
@@ -203,3 +252,27 @@ All methods implemented are identical to those found in the Java [Set](https://d
 ![Combined Performance Charts](PerformanceTesting/V2_V3/toArray.png)
 ![Combined Performance Charts](PerformanceTesting/V2_V3/toArrayT.png)
 ![Combined Performance Charts](PerformanceTesting/V2_V3/toString.png)
+
+### V3 vs V1 Performance
+![Combined Performance Charts](PerformanceTesting/V1_V3/constructor.png)
+![Combined Performance Charts](PerformanceTesting/V1_V3/constructorCapacity.png)
+![Combined Performance Charts](PerformanceTesting/V1_V3/constructorCapacityLoadFactor.png)
+![Combined Performance Charts](PerformanceTesting/V1_V3/constructorCollection.png)
+![Combined Performance Charts](PerformanceTesting/V1_V3/add.png)
+![Combined Performance Charts](PerformanceTesting/V1_V3/addAll.png)
+![Combined Performance Charts](PerformanceTesting/V1_V3/clear.png)
+![Combined Performance Charts](PerformanceTesting/V1_V3/clone.png)
+![Combined Performance Charts](PerformanceTesting/V1_V3/contains.png)
+![Combined Performance Charts](PerformanceTesting/V1_V3/containsAll.png)
+![Combined Performance Charts](PerformanceTesting/V1_V3/equals.png)
+![Combined Performance Charts](PerformanceTesting/V1_V3/hashCode.png)
+![Combined Performance Charts](PerformanceTesting/V1_V3/isEmpty.png)
+![Combined Performance Charts](PerformanceTesting/V1_V3/iterator.png)
+![Combined Performance Charts](PerformanceTesting/V1_V3/spliterator.png)
+![Combined Performance Charts](PerformanceTesting/V1_V3/remove.png)
+![Combined Performance Charts](PerformanceTesting/V1_V3/removeAll.png)
+![Combined Performance Charts](PerformanceTesting/V1_V3/retainAll.png)
+![Combined Performance Charts](PerformanceTesting/V1_V3/size.png)
+![Combined Performance Charts](PerformanceTesting/V1_V3/toArray.png)
+![Combined Performance Charts](PerformanceTesting/V1_V3/toArrayT.png)
+![Combined Performance Charts](PerformanceTesting/V1_V3/toString.png)

@@ -35,9 +35,14 @@ jacocoTestReport {
 }
 
 jmh {
-    includes = ['*CustomSetV3Benchmark*']
-    fork = 2
-    iterations = 3
-    warmupIterations = 2
-    profilers = ['gc']
+    includes = ['CustomSetV3Benchmark']
+
+    fork = 3
+    warmupIterations = 5          // ← best practical value
+    iterations = 10
+    timeOnIteration = '1s'
+    warmup = '1s'
+
+    resultFormat = 'CSV'
+    resultsFile = file('custom-set-v3-results.csv')
 }

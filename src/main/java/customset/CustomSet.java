@@ -15,8 +15,8 @@ import java.util.Set;
 import java.util.Spliterator;
 import java.util.function.Consumer;
 
-import static java.lang.System.identityHashCode;
 import static java.lang.reflect.Array.newInstance;
+import static java.lang.System.identityHashCode;
 import static java.util.Arrays.fill;
 import static java.util.Objects.requireNonNull;
 import static java.util.Objects.requireNonNullElse;
@@ -59,12 +59,13 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
     private transient Node<E>[] table;
 
     private static final int DEFAULT_INITIAL_CAPACITY = 16;
-    private static final float DEFAULT_LOAD_FACTOR = 0.75f;
     private static final int HASH_BITS_TO_SHIFT = 16;
     private static final int MAXIMUM_CAPACITY = 1 << 30;
     private static final int MIN_TREEIFY_CAPACITY = 64;
     private static final int TREEIFY_THRESHOLD   = 8;
     private static final int UNTREEIFY_THRESHOLD = 6;
+
+    private static final float DEFAULT_LOAD_FACTOR = 0.75f;
 
     private transient int modCount = 0;
 
@@ -96,11 +97,8 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
     public CustomSet(final int initialCapacity, final float loadFactor) {
         if (initialCapacity < 0 || loadFactor <= 0 || Float.isNaN(loadFactor) || Float.isInfinite(loadFactor))
             throw new IllegalArgumentException();
-        int capacity = tableSizeFor(initialCapacity);
-        this.table = (Node<E>[]) new Node[capacity];
-        this.size = 0;
         this.loadFactor = loadFactor;
-        setThreshold(capacity);
+        this.threshold = tableSizeFor(initialCapacity);
     }
 
     /**
@@ -494,7 +492,7 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
         table = newTable;
         setThreshold(newCapacity);
 
-        if (oldTable != null && size > 0) {
+        if (oldTable != null && size > 0)
             for (int i = 0; i < oldCapacity; ++i) {
                 Node<E> entry = oldTable[i];
                 if (entry != null) {
@@ -535,7 +533,6 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
                     }
                 }
             }
-        }
     }
 
     private Node<E>[] expand() {

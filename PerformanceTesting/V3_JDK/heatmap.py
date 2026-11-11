@@ -3,16 +3,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# 1. Load data
+# 1. Load data with robust float parsing
 v3_df = pd.read_csv('CustomSetV3_performance.csv', sep=';').sort_values('Size').reset_index(drop=True)
 jdk_df = pd.read_csv('HashSet_performance.csv', sep=';').sort_values('Size').reset_index(drop=True)
 
-# Define desired vertical order (Top to Bottom)
+# Define desired vertical order (Top to Bottom) including all constructors
 ordered_methods = [
     'add(E)', 'addAll(Collection)', 'clear()', 'clone()',
-    'constructor()', 'constructor(Collection)', 'contains(Object)',
-    'containsAll(Collection)', 'equals(Object)', 'hashCode()',
-    'isEmpty()', 'iterator()', 'remove(Object)', 'removeAll(Collection)',
+    'constructor()', 'constructor(Collection)', 'constructor(int)', 'constructor(int, double)',
+    'contains(Object)', 'containsAll(Collection)', 'equals(Object)', 'hashCode()',
+    'isEmpty()', 'iterator()', 'spliterator()', 'remove(Object)', 'removeAll(Collection)',
     'retainAll(Collection)', 'size()', 'toArray()', 'toArray(T[])', 'toString()'
 ]
 
@@ -29,10 +29,10 @@ for m in methods:
     row_vals = []
     row_annots = []
     for size in common_sizes:
-        v3_val = v3_df.loc[v3_df['Size'] == size, m].values[0]
-        jdk_val = jdk_df.loc[jdk_df['Size'] == size, m].values[0]
+        v3_val = float(v3_df.loc[v3_df['Size'] == size, m].values[0])
+        jdk_val = float(jdk_df.loc[jdk_df['Size'] == size, m].values[0])
 
-        v3_c, jdk_c = (1 if v == 0 else v for v in (v3_val, jdk_val))
+        v3_c, jdk_c = (1e-6 if v == 0 else v for v in (v3_val, jdk_val))
 
         ratio = np.log2(jdk_c / v3_c)  # Positive = V3 faster (JDK time / V3 time)
         row_vals.append(ratio)
@@ -70,7 +70,7 @@ sns.heatmap(df_heatmap,
             annot_kws={'size': 9, 'weight': 'bold'})
 
 # 5. Styling
-ax.set_title('V3 vs JDK Performance Speedup Matrix', color='#ffffff', fontsize=16, fontweight='bold', pad=20)
+ax.set_title('V3 vs JDK Performance Speedup Matrix (Including Constructors)', color='#ffffff', fontsize=16, fontweight='bold', pad=20)
 ax.set_ylabel('Set Interface Methods', color='#aaaaaa', fontsize=13, labelpad=10)
 ax.set_xlabel('Collection Size (Elements)', color='#aaaaaa', fontsize=13, labelpad=10)
 
@@ -83,5 +83,5 @@ cbar.ax.tick_params(colors='#ffffff', labelsize=10)
 cbar.ax.yaxis.label.set_color('#ffffff')
 
 plt.tight_layout()
-plt.savefig('heatmap.png', dpi=300, transparent=True)
+plt.savefig('heatmap_with_constructors.png', dpi=300, transparent=True)
 plt.close()

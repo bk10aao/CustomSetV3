@@ -3,84 +3,72 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import gmean
 
-# 1. Load data
-v3_df = pd.read_csv('CustomSetV3_performance.csv', sep=';')
+# 1. Load data with robust float parsing (Comparing V2 vs V3)
 v2_df = pd.read_csv('CustomSetV2_performance.csv', sep=';')
+v3_df = pd.read_csv('CustomSetV3_performance.csv', sep=';')
 
-common_sizes = set(v3_df['Size']).intersection(set(v2_df['Size']))
-v3_df = v3_df[v3_df['Size'].isin(common_sizes)].sort_values('Size').reset_index(drop=True)
+common_sizes = set(v2_df['Size']).intersection(set(v3_df['Size']))
 v2_df = v2_df[v2_df['Size'].isin(common_sizes)].sort_values('Size').reset_index(drop=True)
+v3_df = v3_df[v3_df['Size'].isin(common_sizes)].sort_values('Size').reset_index(drop=True)
 
-methods = [col for col in v3_df.columns if col != 'Size' and col.lower() != 'cleartime']
+# Define methods to include, explicitly omitting 'clear()' and 'retainAll(Collection)'
+excluded_methods = {
+    'clear()',
+    'retainAll(Collection)'
+}
 
-v3_df_fixed = v3_df.copy()
+methods = [
+    col for col in v3_df.columns
+    if col != 'Size' and col not in excluded_methods
+]
+
 v2_df_fixed = v2_df.copy()
+v3_df_fixed = v3_df.copy()
 for col in methods:
-    v3_df_fixed[col] = v3_df_fixed[col].replace(0, 1)
-    v2_df_fixed[col] = v2_df_fixed[col].replace(0, 1)
+    v2_df_fixed[col] = pd.to_numeric(v2_df_fixed[col], errors='coerce').fillna(1).replace(0, 1)
+    v3_df_fixed[col] = pd.to_numeric(v3_df_fixed[col], errors='coerce').fillna(1).replace(0, 1)
 
-ratios = []
-labels = []
-colors = []
-
-v3_win_color = '#FF5C5c'    # Neon Coral / Red for V3
-v2_win_color = '#9B6EF3'   # Neon Purple for V2
-
+data = []
 for m in methods:
-    g_v3 = gmean(v3_df_fixed[m])
     g_v2 = gmean(v2_df_fixed[m])
+    g_v3 = gmean(v3_df_fixed[m])
+    # Speedup factor of V3 over V2 (V2 time / V3 time)
+    speedup = g_v2 / g_v3 if g_v3 > 0 else 1.0
+    data.append({'method': m, 'speedup': speedup})
 
-    if g_v3 < g_v2:
-        # V3 is faster (took less time)
-        speedup = g_v2 / g_v3
-        ratios.append(speedup - 1)
-        colors.append(v3_win_color)
-    else:
-        # V2 is faster
-        speedup = g_v3 / g_v2
-        ratios.append(-(speedup - 1))
-        colors.append(v2_win_color)
-    labels.append(m)
+df_res = pd.DataFrame(data).sort_values('speedup', ascending=True)
 
-sorted_indices = np.argsort(ratios)
-sorted_ratios = [ratios[idx] for idx in sorted_indices]
-sorted_labels = [labels[idx] for idx in sorted_indices]
-sorted_colors = [colors[idx] for idx in sorted_indices]
+speeds = df_res['speedup'].values
+methods_list = df_res['method'].values
+colors = ['#FF5C5c' if s >= 1.0 else '#9B6EF3' for s in speeds]
 
-# Asymmetric limits
-min_ratio = min(sorted_ratios)
-max_ratio = max(sorted_ratios)
-
-left_limit = min(min_ratio - 0.2, -0.5)
-right_limit = max(max_ratio + 0.2, 1.0)
-
-fig_height = max(6, len(methods) * 0.45)
-fig, ax = plt.subplots(figsize=(12, fig_height), facecolor='none')
+fig_height = max(6, len(methods_list) * 0.45)
+fig, ax = plt.subplots(figsize=(11, fig_height), facecolor='none')
 ax.set_facecolor('none')
 
-bars = ax.barh(range(len(sorted_labels)), sorted_ratios, color=sorted_colors, alpha=0.9, height=0.6)
+bars = ax.barh(range(len(methods_list)), speeds - 1.0, color=colors, alpha=0.9, height=0.6)
 ax.axvline(x=0, color='#ffffff', linewidth=1.2)
 
-ax.set_xlim(left_limit, right_limit)
+max_s = max(speeds) - 1.0
+ax.set_xlim(-0.02, max(max_s * 1.15, 0.4))
 
-ticks = [0.0]
-for t in [-4.0, -3.0, -2.0, -1.0, 1.0, 2.0, 3.0, 4.0]:
-    if left_limit <= t <= right_limit:
-        ticks.append(t)
-ticks = sorted(list(set(ticks)))
-
+ticks = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
+ticks = [t for t in ticks if t <= (max_s * 1.15 if max_s > 0 else 0.5)]
 ax.set_xticks(ticks)
-ax.set_xticklabels([f'{abs(t)+1:.1f}x' if abs(t) > 0.05 else 'Tie' for t in ticks],
-                   color='#ffffff', fontsize=11)
+ax.set_xticklabels([f'{t+1.0:.1f}x' for t in ticks], color='#ffffff', fontsize=11)
 
-ax.set_ylim(-0.5, len(methods) - 0.5)
-ax.set_yticks(range(len(sorted_labels)))
-ax.set_yticklabels(sorted_labels, color='#ffffff', fontsize=10)
+ax.set_ylim(-0.5, len(methods_list) - 0.5)
+ax.set_yticks(range(len(methods_list)))
+ax.set_yticklabels(methods_list, color='#ffffff', fontsize=10)
 
-ax.set_title('Overall Relative Performance Comparison (V3 vs V2)\n(Geometric Mean Across All Sizes)',
+ax.set_title('V3 Speedup Factor Over V2\n(Geometric Mean Across All Sizes)',
              fontsize=14, fontweight='bold', pad=15, color='#ffffff')
-ax.set_xlabel('← V2  |  Relative Speedup Factor  |  V3 Faster →',
+ax.set_xlabel('Relative Speedup Multiplier (V2 Time / V3 Time)',
               fontsize=12, labelpad=10, color='#ffffff')
+
+# Add note about omitted methods
+plt.figtext(0.5, 0.02, '* Note: clear() and retainAll(Collection) were omitted due to high degree of difference.',
+            ha='center', color='#aaaaaa', fontsize=10, fontstyle='italic')
 
 ax.grid(True, axis='x', linestyle='--', alpha=0.3, color='#888888')
 ax.tick_params(colors='#ffffff', which='both', length=0)
@@ -88,7 +76,8 @@ ax.tick_params(colors='#ffffff', which='both', length=0)
 for spine in ax.spines.values():
     spine.set_edgecolor('#555555')
 
-plt.tight_layout()
-plt.savefig('geometric_v3_v2.png', dpi=300, transparent=True)
+plt.tight_layout(rect=[0, 0.04, 1, 1])
+plt.savefig('geometric.png', dpi=300, transparent=True, facecolor='none', edgecolor='none')
 plt.close()
-print("Geometric chart V3 vs V2 updated successfully!")
+
+print("Geometric chart updated to unidirectional layout successfully!")

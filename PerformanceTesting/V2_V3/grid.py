@@ -1,5 +1,4 @@
 import matplotlib
-
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
@@ -9,45 +8,51 @@ import numpy as np
 import csv
 
 
-# Custom script to generate V3 vs V2 grid chart
 def load_csv(filepath):
+    """Load semicolon-separated CSV file with robust float/int parsing."""
     data = {}
     with open(filepath, 'r', encoding='utf-8') as f:
         reader = csv.DictReader(f, delimiter=';')
         for row in reader:
-            size = int(row['Size'])
+            size = int(float(row['Size']))
             data[size] = {
-                k: int(v) for k, v in row.items() if k != 'Size'
+                k: float(v) for k, v in row.items() if k != 'Size'
             }
     return data
 
 
 def format_y_axis(value, pos):
+    """Format y-axis labels cleanly with commas or decimals for sub-nanosecond values."""
     if value == 0:
         return '0'
+    elif value < 10:
+        return f'{value:.1f}'
     return f'{int(value):,}'
 
 
 FILES = {
-    'V3': 'CustomSetV3_performance.csv',
     'V2': 'CustomSetV2_performance.csv',
+    'V3': 'CustomSetV3_performance.csv',
 }
 
-OUTPUT_DIR = "V3_V2"
+OUTPUT_DIR = "V2_V3"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 COLORS = {
-    'V3': '#FF5C5c',  # Neon Coral / Red for V3
-    'V2': '#4EA8DE',  # Blue for V2
+    'V2': '#9B6EF3',    # Neon Purple for V2
+    'V3': '#FF5C5c',    # Neon Coral / Red for V3
     'grid': '#252525',
 }
 
+# Comprehensive dictionary mapping all 22 CSV columns
 OPERATIONS = {
     'add(E)': 'add',
     'addAll(Collection)': 'addAll',
     'clear()': 'clear',
     'clone()': 'clone',
     'constructor()': 'constructor',
+    'constructor(int)': 'constructorCapacity',
+    'constructor(int, double)': 'constructorCapacityLoadFactor',
     'constructor(Collection)': 'constructorCollection',
     'contains(Object)': 'contains',
     'containsAll(Collection)': 'containsAll',
@@ -55,6 +60,7 @@ OPERATIONS = {
     'hashCode()': 'hashCode',
     'isEmpty()': 'isEmpty',
     'iterator()': 'iterator',
+    'spliterator()': 'spliterator',
     'remove(Object)': 'remove',
     'removeAll(Collection)': 'removeAll',
     'retainAll(Collection)': 'retainAll',
@@ -73,15 +79,17 @@ for name, path in FILES.items():
 canonical_sizes = sorted(list(canonical_sizes))
 
 x_positions = list(range(len(canonical_sizes)))
-fig, axes = plt.subplots(5, 4, figsize=(22, 24), dpi=150)
+
+# 22 operations total -> 6 rows x 4 columns grid = 24 subplots with transparent background
+fig, axes = plt.subplots(6, 4, figsize=(22, 28), dpi=150)
 fig.patch.set_alpha(0)
 axes_flat = axes.flatten()
 
 legend_elements = [
-    Line2D([0], [0], marker='o', color='none', markerfacecolor=COLORS['V3'], markeredgecolor=COLORS['V3'],
-           markeredgewidth=1.5, markersize=8, label='V3', linestyle='none'),
     Line2D([0], [0], marker='o', color='none', markerfacecolor=COLORS['V2'], markeredgecolor=COLORS['V2'],
-           markeredgewidth=1.5, markersize=8, label='V2', linestyle='none')
+           markeredgewidth=1.5, markersize=8, label='V2', linestyle='none'),
+    Line2D([0], [0], marker='o', color='none', markerfacecolor=COLORS['V3'], markeredgecolor=COLORS['V3'],
+           markeredgewidth=1.5, markersize=8, label='V3', linestyle='none')
 ]
 
 for idx, (op_key, op_label) in enumerate(OPERATIONS.items()):
@@ -100,7 +108,7 @@ for idx, (op_key, op_label) in enumerate(OPERATIONS.items()):
     ax.grid(True, color=COLORS['grid'], linewidth=0.7, linestyle='-', zorder=0)
     ax.set_axisbelow(True)
     ax.set_xticks(x_positions)
-    ax.set_xticklabels([f'{s:,}' for s in canonical_sizes], color='white', fontsize=9, rotation=25)
+    ax.set_xticklabels([f'{s:,}' for s in canonical_sizes], color='white', fontsize=9, rotation=25, ha='right')
     ax.tick_params(axis='x', colors='white', length=0, pad=6)
     ax.set_xlim(-0.4, len(canonical_sizes) - 0.6)
 
@@ -115,6 +123,7 @@ for idx, (op_key, op_label) in enumerate(OPERATIONS.items()):
 
     ax.set_title(op_key, color='white', fontsize=12, fontweight='bold', pad=10)
 
+# Hide any unused subplots in the grid
 for idx in range(len(OPERATIONS), len(axes_flat)):
     axes_flat[idx].set_visible(False)
 
@@ -143,4 +152,4 @@ fig.savefig(
     edgecolor='none'
 )
 plt.close(fig)
-print("V3 vs V2 grid chart created successfully!")
+print("V2 vs V3 grid chart created with transparent background successfully!")

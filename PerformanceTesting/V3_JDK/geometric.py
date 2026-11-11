@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import gmean
 
-# 1. Load data
+# 1. Load data with robust float parsing (fixed paths to local workspace)
 v3_df = pd.read_csv('CustomSetV3_performance.csv', sep=';')
 jdk_df = pd.read_csv('HashSet_performance.csv', sep=';')
 
@@ -11,13 +11,16 @@ common_sizes = set(v3_df['Size']).intersection(set(jdk_df['Size']))
 v3_df = v3_df[v3_df['Size'].isin(common_sizes)].sort_values('Size').reset_index(drop=True)
 jdk_df = jdk_df[jdk_df['Size'].isin(common_sizes)].sort_values('Size').reset_index(drop=True)
 
-methods = [col for col in v3_df.columns if col != 'Size' and col.lower() != 'cleartime']
+methods = [
+    col for col in v3_df.columns
+    if col != 'Size' and col.lower() != 'cleartime'
+]
 
 v3_df_fixed = v3_df.copy()
 jdk_df_fixed = jdk_df.copy()
 for col in methods:
-    v3_df_fixed[col] = v3_df_fixed[col].replace(0, 1)
-    jdk_df_fixed[col] = jdk_df_fixed[col].replace(0, 1)
+    v3_df_fixed[col] = pd.to_numeric(v3_df_fixed[col], errors='coerce').fillna(1).replace(0, 1)
+    jdk_df_fixed[col] = pd.to_numeric(jdk_df_fixed[col], errors='coerce').fillna(1).replace(0, 1)
 
 ratios = []
 labels = []
@@ -31,12 +34,10 @@ for m in methods:
     g_jdk = gmean(jdk_df_fixed[m])
 
     if g_v3 < g_jdk:
-        # V3 is faster (took less time)
         speedup = g_jdk / g_v3
         ratios.append(speedup - 1)
         colors.append(v3_win_color)
     else:
-        # JDK is faster
         speedup = g_v3 / g_jdk
         ratios.append(-(speedup - 1))
         colors.append(jdk_win_color)
@@ -47,7 +48,6 @@ sorted_ratios = [ratios[idx] for idx in sorted_indices]
 sorted_labels = [labels[idx] for idx in sorted_indices]
 sorted_colors = [colors[idx] for idx in sorted_indices]
 
-# Asymmetric limits
 min_ratio = min(sorted_ratios)
 max_ratio = max(sorted_ratios)
 
@@ -91,4 +91,4 @@ for spine in ax.spines.values():
 plt.tight_layout()
 plt.savefig('geometric_v3_jdk.png', dpi=300, transparent=True)
 plt.close()
-print("Geometric chart updated successfully!")
+print("Geometric chart generated successfully with local file paths!")

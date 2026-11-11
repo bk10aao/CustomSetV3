@@ -2,7 +2,7 @@
 """
 Generate performance benchmark charts as PNG files with transparent background.
 Compares V1, V2, V3, and JDK HashSet across all benchmarked operations.
-Saves PNG files into the local directory "V1_V2_V3_JDK".
+Saves PNG files into the local directory.
 """
 
 import matplotlib
@@ -26,12 +26,13 @@ FILES = {
     'JDK': 'HashSet_performance.csv',
 }
 
-OUTPUT_DIR = "V1_V2_V3_JDK"
+OUTPUT_DIR = ""
+
 COLORS = {
     'V1': '#2ECFBF',       # Neon Teal
     'V2': '#9B6EF3',       # Neon Purple
     'V3': '#FF5C5c',       # Neon Coral / Red for V3
-    'JDK': '#FFD166',  # Neon Yellow / Gold for HashSet
+    'JDK': '#FFD166',      # Neon Yellow / Gold for HashSet
     'bg': '#0D0D0D',
     'grid': '#252525',
 }
@@ -46,6 +47,8 @@ OPERATIONS = {
     'clone()': 'clone',
     'constructor()': 'constructor',
     'constructor(Collection)': 'constructorCollection',
+    'constructor(int)': 'constructorInt',
+    'constructor(int, double)': 'constructorIntDouble',
     'contains(Object)': 'contains',
     'containsAll(Collection)': 'containsAll',
     'equals(Object)': 'equals',
@@ -56,6 +59,7 @@ OPERATIONS = {
     'removeAll(Collection)': 'removeAll',
     'retainAll(Collection)': 'retainAll',
     'size()': 'size',
+    'spliterator()': 'spliterator',
     'toArray()': 'toArray',
     'toArray(T[])': 'toArrayT',
     'toString()': 'toString',
@@ -74,7 +78,7 @@ def load_csv(filepath):
         for row in reader:
             size = int(row['Size'])
             data[size] = {
-                k: int(v) for k, v in row.items() if k != 'Size'
+                k: float(v) for k, v in row.items() if k != 'Size'
             }
     return data
 
@@ -87,7 +91,11 @@ def format_y_axis(value, pos):
     """Format y-axis labels with comma separators."""
     if value == 0:
         return '0'
-    return f'{int(value):,}'
+    if value >= 1_000_000:
+        return f'{value/1_000_000:.1f}M'
+    elif value >= 1_000:
+        return f'{value/1_000:.0f}k'
+    return f'{value:.1f}' if isinstance(value, float) and value < 10 else f'{int(value):,}'
 
 
 def create_chart(operation_key, operation_label, datasets, canonical_sizes, output_path):
@@ -195,17 +203,19 @@ def main():
         print(f"  Loaded {len(data)} sizes for {name}")
 
     canonical_sizes = sorted(list(canonical_sizes))
-    print(f"\nUnified sizes for x-axis: {canonical_sizes}")
+    print(f"Unified sizes for x-axis: {canonical_sizes}")
 
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    print(f"\nGenerating comparison charts in '{OUTPUT_DIR}/'...")
+    if OUTPUT_DIR:
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+    out_dir_str = OUTPUT_DIR if OUTPUT_DIR else "."
+    print(f"Generating comparison charts in '{out_dir_str}'...")
 
     for csv_col, chart_label in OPERATIONS.items():
-        output_path = os.path.join(OUTPUT_DIR, f'{chart_label}.png')
+        output_path = os.path.join(OUTPUT_DIR, f'{chart_label}.png') if OUTPUT_DIR else f'{chart_label}.png'
         create_chart(csv_col, chart_label, datasets, canonical_sizes, output_path)
         print(f"  ✓ {chart_label}.png")
 
-    print(f"\n✓ All charts generated successfully in '{OUTPUT_DIR}'!")
+    print("All charts generated successfully!")
 
 
 if __name__ == '__main__':
