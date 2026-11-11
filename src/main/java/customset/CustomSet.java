@@ -406,11 +406,12 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
         int index = 0;
         if (containsNull)
             arr[index++] = null;
-        for (Node<E> node : table)
-            while (node != null) {
-                arr[index++] = node.key;
-                node = node.next;
-            }
+        if (table != null && size > 0)
+            for (Node<E> node : table)
+                while (node != null) {
+                    arr[index++] = node.key;
+                    node = node.next;
+                }
         return arr;
     }
 
@@ -480,7 +481,8 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
     private void ensureCapacity(final int additional) {
         long required = (long)((size + (long) additional ) / (double) loadFactor) + 1;
         int target = tableSizeFor((int)Math.min(required, MAXIMUM_CAPACITY));
-        if (target > table.length)
+        int currentCapacity = (table == null) ? 0 : table.length;
+        if (target > currentCapacity)
             resize(target);
     }
 
