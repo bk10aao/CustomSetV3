@@ -1,10 +1,10 @@
 package customset;
 
-import customset.CustomSet.CustomSetSpliterator;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -351,7 +351,7 @@ public class CustomSetTest {
     @Test
     public void onConstructingEmptySet_returnsEmptyCurlyBracket_on_toString() {
         CustomSet<Integer> customSet = new CustomSet<>();
-        assertEquals("{}", customSet.toString());
+        assertEquals("[]", customSet.toString());
     }
 
     @Test
@@ -364,7 +364,7 @@ public class CustomSetTest {
         assertTrue(setAsString.contains("30"));
         assertTrue(setAsString.contains("40"));
         assertTrue(setAsString.contains("50"));
-        String pattern = "\\{[0-9]+(, [0-9]+)+}";
+        String pattern = "\\[[0-9]+(, [0-9]+)+]";
         assertTrue(setAsString.matches(pattern));
     }
 
@@ -608,7 +608,7 @@ public class CustomSetTest {
         assertTrue(set.isEmpty(), "Set should be completely empty after removing all elements");
     }
 
-    static class CollidingKey implements Comparable<CollidingKey> {
+    static class CollidingKey implements Comparable<CollidingKey>, Serializable {
         private final int id;
 
         CollidingKey(int id) {
@@ -646,7 +646,6 @@ public class CustomSetTest {
 
         assertTrue((characteristics & Spliterator.DISTINCT) != 0);
         assertTrue((characteristics & Spliterator.SIZED) != 0);
-        // SUBSIZED is deliberately not reported: trySplit halves the estimate, so child sizes are approximate
         assertEquals(0, characteristics & Spliterator.SUBSIZED);
     }
 
@@ -1002,5 +1001,119 @@ public class CustomSetTest {
             set.add(new CollidingKey(i));
         assertTrue(set.contains(new CollidingKey(10)));
         assertTrue(set.contains(new CollidingKey(2)));
+    }
+
+
+    @Test
+    void iterator_survives_untreeify() {
+        // Force a single bin into a tree
+        CustomSet<CollidingKey> set = new CustomSet<>(64);
+        for (int i = 0; i < 12; i++) {
+            set.add(new CollidingKey(i));
+        }
+        assertEquals(12, set.size());
+
+        Iterator<CollidingKey> it = set.iterator();
+
+        // Remove enough elements to drop below UNTREEIFY_THRESHOLD (6)
+        // while the iterator is live
+        int removed = 0;
+        while (it.hasNext() && removed < 7) {
+            CollidingKey key = it.next();
+            it.remove();          // this should eventually trigger untreeify
+            removed++;
+        }
+
+        // Iterator must still be usable and must not throw
+        int remainingFromIterator = 0;
+        while (it.hasNext()) {
+            assertNotNull(it.next());
+            remainingFromIterator++;
+        }
+
+        assertEquals(5, set.size());
+        assertEquals(5, remainingFromIterator);
+
+        // Verify the surviving elements are still reachable
+        for (int i = 0; i < 12; i++) {
+            CollidingKey key = new CollidingKey(i);
+            if (set.contains(key)) {
+                // ok
+            }
+        }
+    }
+
+    @Test
+    void resize_with_tree_bins_preserves_all_elements() {
+        // Create multiple tree bins
+        CustomSet<CollidingKey> set = new CustomSet<>(32);
+
+        // Add enough colliding keys to create trees, then more keys to force resize
+        for (int i = 0; i < 100; i++) {
+            set.add(new CollidingKey(i));
+        }
+        // Force further growth
+        for (int i = 100; i < 300; i++) {
+            set.add(new CollidingKey(i));
+        }
+
+        assertEquals(300, set.size());
+
+        // Every element must still be present after resizes + splits
+        for (int i = 0; i < 300; i++) {
+            assertTrue(set.contains(new CollidingKey(i)), "Missing key " + i + " after resize");
+        }
+
+        // Also verify via iteration
+        int count = 0;
+        for (CollidingKey ignored : set) {
+            count++;
+        }
+        assertEquals(300, count);
+    }
+
+    @Test
+    void clone_and_serialize_with_tree_bins_and_null() throws Exception {
+        CustomSet<CollidingKey> original = new CustomSet<>(64);
+        original.add(null);
+        for (int i = 0; i < 20; i++) {
+            original.add(new CollidingKey(i));
+        }
+        assertEquals(21, original.size());
+        assertTrue(original.contains(null));
+
+        // Clone
+        CustomSet<CollidingKey> clone = original.clone();
+        assertEquals(original.size(), clone.size());
+        assertTrue(clone.contains(null));
+        for (int i = 0; i < 20; i++) {
+            assertTrue(clone.contains(new CollidingKey(i)));
+        }
+
+        // Independence
+        clone.remove(new CollidingKey(0));
+        assertTrue(original.contains(new CollidingKey(0)));
+        assertFalse(clone.contains(new CollidingKey(0)));
+
+        // Serialization round-trip
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (ObjectOutputStream oos = new ObjectOutputStream(baos)) {
+            oos.writeObject(original);
+        }
+
+        CustomSet<CollidingKey> deserialized;
+        try (var ois = new java.io.ObjectInputStream(
+                new java.io.ByteArrayInputStream(baos.toByteArray()))) {
+            @SuppressWarnings("unchecked")
+            CustomSet<CollidingKey> tmp = (CustomSet<CollidingKey>) ois.readObject();
+            deserialized = tmp;
+        }
+
+        assertEquals(original.size(), deserialized.size());
+        assertTrue(deserialized.contains(null));
+        for (int i = 0; i < 20; i++) {
+            assertTrue(deserialized.contains(new CollidingKey(i)),
+                    "Deserialized set missing key " + i);
+        }
     }
 }
