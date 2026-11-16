@@ -303,7 +303,7 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
      * @return an iterator over the elements in this set
      */
     public Iterator<E> iterator() {
-        return new HashIterator(this);
+        return new HashIterator<>(this);
     }
 
     /**

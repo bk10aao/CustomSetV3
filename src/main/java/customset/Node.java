@@ -13,6 +13,13 @@ class Node<E> {
     final E key;
     Node<E> next;
 
+    /**
+     * Constructs a new node.
+     *
+     * @param hash the cached hash code of the key
+     * @param key  the element key stored in this node
+     * @param next the next node in the collision chain, or {@code null} if none
+     */
     protected Node(final int hash, final E key, final Node<E> next) {
         this.hash = hash;
         this.key = key;
