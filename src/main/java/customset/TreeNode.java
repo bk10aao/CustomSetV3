@@ -29,6 +29,272 @@ final class TreeNode<E> extends Node<E> {
     }
 
     /**
+     * Retrieves the tree node matching the specified hash and object key from the tree root.
+     *
+     * @param hash the hash code of the object
+     * @param o    the object key to search for
+     * @return the matching tree node, or {@code null} if not present
+     */
+    TreeNode<?> getTreeNode(final int hash, final Object o) {
+        return ((parent != null) ? root() : this).find(hash, o, null);
+    }
+
+    /**
+     * Inserts a value into the Red-Black tree bin, treeifying or balancing as necessary.
+     *
+     * @param tab   the hash table array
+     * @param hash  the hash code of the value
+     * @param value the element value to insert
+     * @return the existing tree node if already present, or {@code null} upon successful insertion
+     */
+    TreeNode<E> putTreeVal(final Node<E>[] tab, final int hash, final E value) {
+        Class<?> kc = null;
+        boolean searched = false;
+        TreeNode<E> root = (parent != null) ? root() : this;
+        for (TreeNode<E> p = root; ; ) {
+            int dir;
+            if (p.hash > hash)
+                dir = -1;
+            else if (p.hash < hash)
+                dir = 1;
+            else if (keysMatch(value, p))
+                return p;
+            else if ((kc == null && (kc = comparableClassFor(value)) == null)
+                    || (dir = compareComparables(kc, value, p.key)) == 0) {
+                if (!searched) {
+                    TreeNode<E> q, ch;
+                    searched = true;
+                    if (((ch = p.left) != null && (q = ch.find(hash, value, kc)) != null)
+                            || ((ch = p.right) != null && (q = ch.find(hash, value, kc)) != null))
+                        return q;
+                }
+                dir = tieBreakOrder(value, p.key);
+            }
+            TreeNode<E> parentOfNewNode = p;
+            if ((p = (dir <= 0) ? p.left : p.right) == null) {
+                Node<E> nextAfterInsertion = parentOfNewNode.next;
+                TreeNode<E> newNode = new TreeNode<>(hash, value, nextAfterInsertion);
+                if (dir <= 0)
+                    parentOfNewNode.left = newNode;
+                else
+                    parentOfNewNode.right = newNode;
+                parentOfNewNode.next = newNode;
+                newNode.parent = newNode.previous = parentOfNewNode;
+                if (nextAfterInsertion != null)
+                    ((TreeNode<E>) nextAfterInsertion).previous = newNode;
+                moveRootToFront(tab, balanceInsertion(root, newNode));
+                return null;
+            }
+        }
+    }
+
+    /**
+     * Removes this node from the Red-Black tree, maintains the secondary
+     * linked-list view, rebalances, and converts back to a plain list
+     * when the remaining tree falls below the untreeify threshold.
+     *
+     * @param tab the hash table array
+     */
+    void removeTreeNode(final Node<E>[] tab) {
+        int tableLength;
+        if (tab == null || (tableLength = tab.length) == 0)
+            return;
+        final int index = (tableLength - 1) & hash;
+        TreeNode<E> first = (TreeNode<E>) tab[index];
+        TreeNode<E> root = first;
+        TreeNode<E> nextLinkedNode = (TreeNode<E>) next;
+        TreeNode<E> previousLinkedNode = previous;
+        if (previousLinkedNode == null)
+            tab[index] = first = nextLinkedNode;
+        else
+            previousLinkedNode.next = nextLinkedNode;
+        if (nextLinkedNode != null)
+            nextLinkedNode.previous = previousLinkedNode;
+        if (first == null)
+            return;
+        if (root.parent != null)
+            root = root.root();
+        int binCount = 0;
+        TreeNode<E> hd = root;
+        while (hd.previous != null)
+            hd = hd.previous;
+        for (TreeNode<E> node = hd; node != null; node = (TreeNode<E>) node.next)
+            binCount++;
+        TreeNode<E> rl;
+        if (binCount <= UNTREEIFY_THRESHOLD || root.right == null || (rl = root.left) == null || rl.left == null) {
+            TreeNode<E> headNode = root;
+            while (headNode.previous != null)
+                headNode = headNode.previous;
+            tab[index] = headNode.untreeify();
+            return;
+        }
+        TreeNode<E> nodeToDelete = this;
+        TreeNode<E> leftChild = left;
+        TreeNode<E> rightChild = right;
+        TreeNode<E> replacement;
+        if (leftChild != null && rightChild != null) {
+            TreeNode<E> inOrderSuccessor = rightChild;
+            for (TreeNode<E> successorLeft; (successorLeft = inOrderSuccessor.left) != null; )
+                inOrderSuccessor = successorLeft;
+            boolean swappedColor = inOrderSuccessor.isRed;
+            inOrderSuccessor.isRed = nodeToDelete.isRed;
+            nodeToDelete.isRed = swappedColor;
+            TreeNode<E> successorRight = inOrderSuccessor.right;
+            TreeNode<E> parentNode = nodeToDelete.parent;
+            if (inOrderSuccessor == rightChild) {
+                nodeToDelete.parent = inOrderSuccessor;
+                inOrderSuccessor.right = nodeToDelete;
+            } else {
+                TreeNode<E> successorParent = inOrderSuccessor.parent;
+                if ((nodeToDelete.parent = successorParent) != null)
+                    if (inOrderSuccessor == successorParent.left)
+                        successorParent.left = nodeToDelete;
+                    else
+                        successorParent.right = nodeToDelete;
+                if ((inOrderSuccessor.right = rightChild) != null)
+                    rightChild.parent = inOrderSuccessor;
+            }
+            nodeToDelete.left = null;
+            if ((nodeToDelete.right = successorRight) != null)
+                successorRight.parent = nodeToDelete;
+            if ((inOrderSuccessor.left = leftChild) != null)
+                leftChild.parent = inOrderSuccessor;
+            if ((inOrderSuccessor.parent = parentNode) == null)
+                root = inOrderSuccessor;
+            else if (nodeToDelete == parentNode.left)
+                parentNode.left = inOrderSuccessor;
+            else
+                parentNode.right = inOrderSuccessor;
+            replacement = (successorRight != null) ? successorRight : nodeToDelete;
+        } else
+            replacement = requireNonNullElseGet(leftChild, () -> requireNonNullElse(rightChild, nodeToDelete));
+        if (replacement != nodeToDelete) {
+            TreeNode<E> pp = replacement.parent = nodeToDelete.parent;
+            if (pp == null)
+                root = replacement;
+            else if (nodeToDelete == pp.left)
+                pp.left = replacement;
+            else
+                pp.right = replacement;
+            nodeToDelete.left = nodeToDelete.right = nodeToDelete.parent = null;
+        }
+        TreeNode<E> r = nodeToDelete.isRed ? root : balanceDeletion(root, replacement);
+        if (replacement == nodeToDelete) {
+            TreeNode<E> pp = nodeToDelete.parent;
+            nodeToDelete.parent = null;
+            if (pp != null) {
+                if (nodeToDelete == pp.left)
+                    pp.left = null;
+                else if (nodeToDelete == pp.right)
+                    pp.right = null;
+            }
+        }
+        moveRootToFront(tab, r);
+    }
+
+    /**
+     * Splits a tree bin into low and high bins during table resizing,
+     * untreeifying them if they drop below the threshold.
+     *
+     * @param tab         the hash table array
+     * @param index       the current bucket index
+     * @param capacityBit the capacity bit mask used for partitioning
+     */
+    void split(final Node<E>[] tab, final int index, final int capacityBit) {
+        TreeNode<E> binRoot = this, lowHead = null, lowTail = null, highHead = null, highTail = null;
+        int lowCount = 0, highCount = 0;
+        for (TreeNode<E> currentNode = binRoot, next; currentNode != null; currentNode = next) {
+            next = (TreeNode<E>) currentNode.next;
+            currentNode.next = null;
+            if ((currentNode.hash & capacityBit) == 0) {
+                if ((currentNode.previous = lowTail) == null)
+                    lowHead = currentNode;
+                else
+                    lowTail.next = currentNode;
+                lowTail = currentNode;
+                ++lowCount;
+            } else {
+                if ((currentNode.previous = highTail) == null)
+                    highHead = currentNode;
+                else
+                    highTail.next = currentNode;
+                highTail = currentNode;
+                ++highCount;
+            }
+        }
+        if (lowHead != null)
+            if (lowCount <= UNTREEIFY_THRESHOLD)
+                tab[index] = lowHead.untreeify();
+            else {
+                tab[index] = lowHead;
+                if (highHead != null)
+                    lowHead.treeify(tab);
+            }
+        if (highHead != null)
+            if (highCount <= UNTREEIFY_THRESHOLD)
+                tab[index + capacityBit] = highHead.untreeify();
+            else {
+                tab[index + capacityBit] = highHead;
+                if (lowHead != null)
+                    highHead.treeify(tab);
+            }
+    }
+
+    /**
+     * Forms a balanced Red-Black tree out of the linked list nodes starting from this node.
+     *
+     * @param tab the hash table array
+     */
+    void treeify(final Node<E>[] tab) {
+        TreeNode<E> root = null;
+        for (TreeNode<E> current = this, nextNode; current != null; current = nextNode) {
+            nextNode = (TreeNode<E>) current.next;
+            current.left = current.right = null;
+            if (root == null) {
+                current.parent = null;
+                current.isRed = false;
+                root = current;
+            } else
+                for (TreeNode<E> parent = root; ; ) {
+                    int direction = compare(current.hash, parent.hash, current.key, parent.key);
+                    TreeNode<E> insertionPoint = parent;
+                    if ((parent = (direction <= 0) ? parent.left : parent.right) == null) {
+                        current.parent = insertionPoint;
+                        if (direction <= 0)
+                            insertionPoint.left = current;
+                        else
+                            insertionPoint.right = current;
+                        root = balanceInsertion(root, current);
+                        break;
+                    }
+                }
+        }
+        moveRootToFront(tab, root);
+    }
+
+    /**
+     * Converts this tree node structure back into a standard singly-linked list of {@link Node} instances.
+     *
+     * @return the head node of the new linked list
+     */
+    Node<E> untreeify() {
+        Node<E> head = null, tail = null;
+        TreeNode<E> current = this;
+        while (current.previous != null)
+            current = current.previous;
+        while (current != null) {
+            Node<E> newNode = new Node<>(current.hash, current.key, null);
+            if (tail == null)
+                head = newNode;
+            else
+                tail.next = newNode;
+            tail = newNode;
+            current = (TreeNode<E>) current.next;
+        }
+        return head;
+    }
+
+    /**
      * Re-balances the Red-Black tree after a node deletion.
      *
      * @param root      the current root of the tree
@@ -263,17 +529,6 @@ final class TreeNode<E> extends Node<E> {
     }
 
     /**
-     * Retrieves the tree node matching the specified hash and object key from the tree root.
-     *
-     * @param hash the hash code of the object
-     * @param o    the object key to search for
-     * @return the matching tree node, or {@code null} if not present
-     */
-    TreeNode<?> getTreeNode(final int hash, final Object o) {
-        return ((parent != null) ? root() : this).find(hash, o, null);
-    }
-
-    /**
      * Ensures that the given root node of a red-black tree bin is placed at the front
      * of the bucket's collision chain in the table.
      *
@@ -299,159 +554,6 @@ final class TreeNode<E> extends Node<E> {
                 root.previous = null;
             }
         }
-    }
-
-    /**
-     * Inserts a value into the Red-Black tree bin, treeifying or balancing as necessary.
-     *
-     * @param tab   the hash table array
-     * @param hash  the hash code of the value
-     * @param value the element value to insert
-     * @return the existing tree node if already present, or {@code null} upon successful insertion
-     */
-    TreeNode<E> putTreeVal(final Node<E>[] tab, final int hash, final E value) {
-        Class<?> kc = null;
-        boolean searched = false;
-        TreeNode<E> root = (parent != null) ? root() : this;
-        for (TreeNode<E> p = root; ; ) {
-            int dir;
-            if (p.hash > hash)
-                dir = -1;
-            else if (p.hash < hash)
-                dir = 1;
-            else if (keysMatch(value, p))
-                return p;
-            else if ((kc == null && (kc = comparableClassFor(value)) == null)
-                    || (dir = compareComparables(kc, value, p.key)) == 0) {
-                if (!searched) {
-                    TreeNode<E> q, ch;
-                    searched = true;
-                    if (((ch = p.left) != null && (q = ch.find(hash, value, kc)) != null)
-                            || ((ch = p.right) != null && (q = ch.find(hash, value, kc)) != null))
-                        return q;
-                }
-                dir = tieBreakOrder(value, p.key);
-            }
-            TreeNode<E> parentOfNewNode = p;
-            if ((p = (dir <= 0) ? p.left : p.right) == null) {
-                Node<E> nextAfterInsertion = parentOfNewNode.next;
-                TreeNode<E> newNode = new TreeNode<>(hash, value, nextAfterInsertion);
-                if (dir <= 0)
-                    parentOfNewNode.left = newNode;
-                else
-                    parentOfNewNode.right = newNode;
-                parentOfNewNode.next = newNode;
-                newNode.parent = newNode.previous = parentOfNewNode;
-                if (nextAfterInsertion != null)
-                    ((TreeNode<E>) nextAfterInsertion).previous = newNode;
-                moveRootToFront(tab, balanceInsertion(root, newNode));
-                return null;
-            }
-        }
-    }
-
-    /**
-     * Removes this node from the Red-Black tree, maintains the secondary
-     * linked-list view, rebalances, and converts back to a plain list
-     * when the remaining tree falls below the untreeify threshold.
-     *
-     * @param tab the hash table array
-     */
-    void removeTreeNode(final Node<E>[] tab) {
-        int tableLength;
-        if (tab == null || (tableLength = tab.length) == 0)
-            return;
-        final int index = (tableLength - 1) & hash;
-        TreeNode<E> first = (TreeNode<E>) tab[index];
-        TreeNode<E> root = first;
-        TreeNode<E> nextLinkedNode = (TreeNode<E>) next;
-        TreeNode<E> previousLinkedNode = previous;
-        if (previousLinkedNode == null)
-            tab[index] = first = nextLinkedNode;
-        else
-            previousLinkedNode.next = nextLinkedNode;
-        if (nextLinkedNode != null)
-            nextLinkedNode.previous = previousLinkedNode;
-        if (first == null)
-            return;
-        if (root.parent != null)
-            root = root.root();
-        int binCount = 0;
-        TreeNode<E> hd = root;
-        while (hd.previous != null)
-            hd = hd.previous;
-        for (TreeNode<E> node = hd; node != null; node = (TreeNode<E>) node.next)
-            binCount++;
-        TreeNode<E> rl;
-        if (binCount <= UNTREEIFY_THRESHOLD || root.right == null || (rl = root.left) == null || rl.left == null) {
-            TreeNode<E> headNode = root;
-            while (headNode.previous != null)
-                headNode = headNode.previous;
-            tab[index] = headNode.untreeify();
-            return;
-        }
-        TreeNode<E> nodeToDelete = this;
-        TreeNode<E> leftChild = left;
-        TreeNode<E> rightChild = right;
-        TreeNode<E> replacement;
-        if (leftChild != null && rightChild != null) {
-            TreeNode<E> inOrderSuccessor = rightChild;
-            for (TreeNode<E> successorLeft; (successorLeft = inOrderSuccessor.left) != null; )
-                inOrderSuccessor = successorLeft;
-            boolean swappedColor = inOrderSuccessor.isRed;
-            inOrderSuccessor.isRed = nodeToDelete.isRed;
-            nodeToDelete.isRed = swappedColor;
-            TreeNode<E> successorRight = inOrderSuccessor.right;
-            TreeNode<E> parentNode = nodeToDelete.parent;
-            if (inOrderSuccessor == rightChild) {
-                nodeToDelete.parent = inOrderSuccessor;
-                inOrderSuccessor.right = nodeToDelete;
-            } else {
-                TreeNode<E> successorParent = inOrderSuccessor.parent;
-                if ((nodeToDelete.parent = successorParent) != null)
-                    if (inOrderSuccessor == successorParent.left)
-                        successorParent.left = nodeToDelete;
-                    else
-                        successorParent.right = nodeToDelete;
-                if ((inOrderSuccessor.right = rightChild) != null)
-                    rightChild.parent = inOrderSuccessor;
-            }
-            nodeToDelete.left = null;
-            if ((nodeToDelete.right = successorRight) != null)
-                successorRight.parent = nodeToDelete;
-            if ((inOrderSuccessor.left = leftChild) != null)
-                leftChild.parent = inOrderSuccessor;
-            if ((inOrderSuccessor.parent = parentNode) == null)
-                root = inOrderSuccessor;
-            else if (nodeToDelete == parentNode.left)
-                parentNode.left = inOrderSuccessor;
-            else
-                parentNode.right = inOrderSuccessor;
-            replacement = (successorRight != null) ? successorRight : nodeToDelete;
-        } else
-            replacement = requireNonNullElseGet(leftChild, () -> requireNonNullElse(rightChild, nodeToDelete));
-        if (replacement != nodeToDelete) {
-            TreeNode<E> pp = replacement.parent = nodeToDelete.parent;
-            if (pp == null)
-                root = replacement;
-            else if (nodeToDelete == pp.left)
-                pp.left = replacement;
-            else
-                pp.right = replacement;
-            nodeToDelete.left = nodeToDelete.right = nodeToDelete.parent = null;
-        }
-        TreeNode<E> r = nodeToDelete.isRed ? root : balanceDeletion(root, replacement);
-        if (replacement == nodeToDelete) {
-            TreeNode<E> pp = nodeToDelete.parent;
-            nodeToDelete.parent = null;
-            if (pp != null) {
-                if (nodeToDelete == pp.left)
-                    pp.left = null;
-                else if (nodeToDelete == pp.right)
-                    pp.right = null;
-            }
-        }
-        moveRootToFront(tab, r);
     }
 
     /**
@@ -515,54 +617,6 @@ final class TreeNode<E> extends Node<E> {
     }
 
     /**
-     * Splits a tree bin into low and high bins during table resizing,
-     * untreeifying them if they drop below the threshold.
-     *
-     * @param tab         the hash table array
-     * @param index       the current bucket index
-     * @param capacityBit the capacity bit mask used for partitioning
-     */
-    void split(final Node<E>[] tab, final int index, final int capacityBit) {
-        TreeNode<E> binRoot = this, lowHead = null, lowTail = null, highHead = null, highTail = null;
-        int lowCount = 0, highCount = 0;
-        for (TreeNode<E> currentNode = binRoot, next; currentNode != null; currentNode = next) {
-            next = (TreeNode<E>) currentNode.next;
-            currentNode.next = null;
-            if ((currentNode.hash & capacityBit) == 0) {
-                if ((currentNode.previous = lowTail) == null)
-                    lowHead = currentNode;
-                else
-                    lowTail.next = currentNode;
-                lowTail = currentNode;
-                ++lowCount;
-            } else {
-                if ((currentNode.previous = highTail) == null)
-                    highHead = currentNode;
-                else
-                    highTail.next = currentNode;
-                highTail = currentNode;
-                ++highCount;
-            }
-        }
-        if (lowHead != null)
-            if (lowCount <= UNTREEIFY_THRESHOLD)
-                tab[index] = lowHead.untreeify();
-            else {
-                tab[index] = lowHead;
-                if (highHead != null)
-                    lowHead.treeify(tab);
-            }
-        if (highHead != null)
-            if (highCount <= UNTREEIFY_THRESHOLD)
-                tab[index + capacityBit] = highHead.untreeify();
-            else {
-                tab[index + capacityBit] = highHead;
-                if (lowHead != null)
-                    highHead.treeify(tab);
-            }
-    }
-
-    /**
      * Determines a tie-breaker comparison order for non-comparable objects based on class name and identity hash code.
      *
      * @param a the first object
@@ -574,59 +628,5 @@ final class TreeNode<E> extends Node<E> {
         if (a == null || b == null || (d = a.getClass().getName().compareTo(b.getClass().getName())) == 0)
             d = identityHashCode(a) <= identityHashCode(b) ? -1 : 1;
         return d;
-    }
-
-    /**
-     * Forms a balanced Red-Black tree out of the linked list nodes starting from this node.
-     *
-     * @param tab the hash table array
-     */
-    void treeify(final Node<E>[] tab) {
-        TreeNode<E> root = null;
-        for (TreeNode<E> current = this, nextNode; current != null; current = nextNode) {
-            nextNode = (TreeNode<E>) current.next;
-            current.left = current.right = null;
-            if (root == null) {
-                current.parent = null;
-                current.isRed = false;
-                root = current;
-            } else
-                for (TreeNode<E> parent = root; ; ) {
-                    int direction = compare(current.hash, parent.hash, current.key, parent.key);
-                    TreeNode<E> insertionPoint = parent;
-                    if ((parent = (direction <= 0) ? parent.left : parent.right) == null) {
-                        current.parent = insertionPoint;
-                        if (direction <= 0)
-                            insertionPoint.left = current;
-                        else
-                            insertionPoint.right = current;
-                        root = balanceInsertion(root, current);
-                        break;
-                    }
-                }
-        }
-        moveRootToFront(tab, root);
-    }
-
-    /**
-     * Converts this tree node structure back into a standard singly-linked list of {@link Node} instances.
-     *
-     * @return the head node of the new linked list
-     */
-    Node<E> untreeify() {
-        Node<E> head = null, tail = null;
-        TreeNode<E> current = this;
-        while (current.previous != null)
-            current = current.previous;
-        while (current != null) {
-            Node<E> newNode = new Node<>(current.hash, current.key, null);
-            if (tail == null)
-                head = newNode;
-            else
-                tail.next = newNode;
-            tail = newNode;
-            current = (TreeNode<E>) current.next;
-        }
-        return head;
     }
 }

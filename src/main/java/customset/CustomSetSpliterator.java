@@ -17,10 +17,11 @@ import static java.util.Objects.requireNonNull;
 class CustomSetSpliterator<E> implements Spliterator<E> {
 
     private final CustomSet<E> set;
+    private final int expectedModCount;
+
     private Node<E> current;
     private Node<E>[] table;
     private long estimatedSize;
-    private final int expectedModCount;
     private int fence;
     private int index;
     private boolean includeNull;

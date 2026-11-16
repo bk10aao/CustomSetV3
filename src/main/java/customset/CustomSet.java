@@ -756,7 +756,14 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
         s.defaultWriteObject();
         s.writeInt(table == null ? 0 : table.length);
         s.writeInt(size);
-        for (E e : this)
-            s.writeObject(e);
+        if (containsNull) {
+            s.writeObject(null);
+        }
+        if (table != null && size > 0)
+            for (Node<E> node : table)
+                while (node != null) {
+                    s.writeObject(node.key);
+                    node = node.next;
+                }
     }
 }
