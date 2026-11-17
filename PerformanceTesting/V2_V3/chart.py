@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Generate performance comparison charts between CustomSet V2 and CustomSet V3.
-Saves PNG files into the local directory "V2_V3".
+Generate performance comparison charts between CustomSet V3 and CustomSet V2.
+Saves PNG files into the local directory "V3_V2".
 """
 
 import matplotlib
@@ -19,22 +19,22 @@ import numpy as np
 # ──────────────────────────────────────────────────────────────────────────────
 
 FILES = {
-    'V2': 'CustomSetV2_performance.csv',
     'V3': 'CustomSetV3_performance.csv',
+    'V2': 'CustomSetV2_performance.csv',
 }
 
-OUTPUT_DIR = "./V2_V3"
+OUTPUT_DIR = ""
 
 COLORS = {
-    'V2': '#9B6EF3',       # Neon Purple for V2
-    'V3': '#FF5C5c',       # Neon Coral / Red for V3
+    'V3': '#FF5C5c',    # Neon Coral / Red for V3
+    'V2': '#9B6EF3',    # Neon Purple for V2
     'grid': '#252525',
 }
 
 FIGURE_SIZE = (12, 6.5)
 DPI = 150
 
-# Comprehensive dictionary mapping every method found in the CSV columns
+# Exact mapping matching CSV column headers
 OPERATIONS = {
     'add(E)': 'add',
     'addAll(Collection)': 'addAll',
@@ -73,7 +73,8 @@ def load_csv(filepath):
         for row in reader:
             size = int(float(row['Size']))
             data[size] = {
-                k: float(v) for k, v in row.items() if k != 'Size'
+                k: float(v) if v not in (None, '') else np.nan
+                for k, v in row.items() if k != 'Size'
             }
     return data
 
@@ -93,7 +94,7 @@ def format_y_axis(value, pos):
 
 def create_chart(operation_key, operation_label, datasets, canonical_sizes, output_path):
     """
-    Create a head-to-head performance chart comparing CustomSet V2 and V3.
+    Create a head-to-head performance chart comparing CustomSet V3 and CustomSet V2.
     """
     fig, ax = plt.subplots(figsize=FIGURE_SIZE, dpi=DPI)
     fig.patch.set_alpha(0)
@@ -174,7 +175,6 @@ def create_chart(operation_key, operation_label, datasets, canonical_sizes, outp
         text.set_color('white')
         text.set_fontsize(12)
 
-    plt.tight_layout(rect=[0, 0.22, 1, 1])
     fig.savefig(
         output_path,
         dpi=DPI,
@@ -209,7 +209,7 @@ def main():
     print(f"\nUnified sizes for x-axis: {canonical_sizes}")
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    print(f"\nGenerating V2 vs V3 comparison charts in '{OUTPUT_DIR}/'...")
+    print(f"\nGenerating V3 vs V2 comparison charts in '{OUTPUT_DIR}/'...")
 
     generated_count = 0
     for csv_col, chart_label in OPERATIONS.items():

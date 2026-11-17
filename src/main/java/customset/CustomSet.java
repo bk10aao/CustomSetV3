@@ -39,6 +39,7 @@ import static java.util.Objects.requireNonNull;
  */
 public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
 
+    //TODO, check retainAll performance
     @Serial
     private static final long serialVersionUID = 1L;
 
@@ -367,11 +368,12 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
         requireNonNull(c, "Collection must not be null.");
         if (size == 0)
             return false;
+        final Collection<?> retainValues = (c instanceof Set) ? c : new CustomSet<>(c);
         boolean modified = false;
         Iterator<E> it = iterator();
         while (it.hasNext()) {
             E element = it.next();
-            if (!c.contains(element)) {
+            if (!retainValues.contains(element)) {
                 it.remove();
                 modified = true;
             }

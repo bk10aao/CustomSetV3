@@ -5,17 +5,17 @@ import seaborn as sns
 
 # 1. Load data
 v1_df = (
-    pd.read_csv('CustomSetV1_performance.csv', sep=';')
+    pd.read_csv('V1_V3/CustomSetV1_performance.csv', sep=';')
     .sort_values('Size')
     .reset_index(drop=True)
 )
 v3_df = (
-    pd.read_csv('CustomSetV3_performance.csv', sep=';')
+    pd.read_csv('V1_V3/CustomSetV3_performance.csv', sep=';')
     .sort_values('Size')
     .reset_index(drop=True)
 )
 
-# Define desired vertical order (Top to Bottom), strictly excluding all constructors
+# Define desired vertical order (Top to Bottom), excluding constructors and retainAll
 ordered_methods = [
     'add(E)',
     'addAll(Collection)',
@@ -30,7 +30,6 @@ ordered_methods = [
     'spliterator()',
     'remove(Object)',
     'removeAll(Collection)',
-    'retainAll(Collection)',
     'size()',
     'toArray()',
     'toArray(T[])',
@@ -120,8 +119,8 @@ fig.text(
     0.5,
     0.02,
     (
-        'Note: Constructors omitted due to extreme scale differences obscuring'
-        ' standard method results'
+        'Note: Constructors and retainAll(Collection) omitted due to extreme'
+        ' scale differences obscuring standard method results'
     ),
     ha='center',
     va='bottom',
@@ -131,6 +130,6 @@ fig.text(
 )
 
 plt.tight_layout(rect=[0, 0.05, 1, 1])
-plt.savefig('heatmap_v3_v1_note_below.png', dpi=300, transparent=True)
+plt.savefig('heatmap.png', dpi=300, transparent=True)
 plt.close()
-print('Heatmap with note below generated successfully!')
+print('Heatmap updated successfully!')

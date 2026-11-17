@@ -5,15 +5,15 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 /**
- * A fail-fast, hybrid {@link Iterator} implementation for traversing elements of a {@link CustomSet}[cite: 8].
+ * A fail-fast, hybrid {@link Iterator} implementation for traversing elements of a {@link CustomSet}.
  *
  * <p>{@code HashIterator} performs zero-allocation pointer traversal across standard singly-linked
- * collision chains[cite: 4, 8] while capturing a localized key snapshot when stepping into a
- * {@link TreeNode} bin[cite: 8]. This hybrid approach preserves $O(1)$ lazy setup across standard
+ * collision chains while capturing a localized key snapshot when stepping into a
+ * {@link TreeNode} bin. This hybrid approach preserves $O(1)$ lazy setup across standard
  * buckets while guaranteeing safe, uninterrupted iteration if {@link #remove()} triggers Red-Black
- * tree root rotations or untreeification[cite: 7, 8].
+ * tree root rotations or untreeification.
  *
- * @param <E> the type of elements returned by this iterator[cite: 8]
+ * @param <E> the type of elements returned by this iterator.
  */
 final class HashIterator<E> implements Iterator<E> {
 
@@ -30,9 +30,9 @@ final class HashIterator<E> implements Iterator<E> {
 
     /**
      * Constructs a new {@code HashIterator} positioned at the first available element
-     * in the specified set, yielding {@code null} first if present[cite: 8].
+     * in the specified set, yielding {@code null} first if present.
      *
-     * @param set the backing {@link CustomSet} to iterate over[cite: 8]
+     * @param set the backing {@link CustomSet} to iterate over
      */
     HashIterator(final CustomSet<E> set) {
         this.set = set;
@@ -45,9 +45,9 @@ final class HashIterator<E> implements Iterator<E> {
     }
 
     /**
-     * Returns {@code true} if the iteration has more elements[cite: 8].
+     * Returns {@code true} if the iteration has more elements.
      *
-     * @return {@code true} if the iterator has more elements[cite: 8]
+     * @return {@code true} if the iterator has more elements
      */
     @Override
     public boolean hasNext() {
@@ -55,11 +55,11 @@ final class HashIterator<E> implements Iterator<E> {
     }
 
     /**
-     * Returns the next element in the iteration[cite: 8].
+     * Returns the next element in the iteration.
      *
-     * @return the next element in the iteration[cite: 8]
-     * @throws NoSuchElementException          if the iteration has no more elements[cite: 8]
-     * @throws ConcurrentModificationException if the backing set was structurally modified concurrently[cite: 8]
+     * @return the next element in the iteration
+     * @throws NoSuchElementException          if the iteration has no more elements
+     * @throws ConcurrentModificationException if the backing set was structurally modified concurrently
      */
     @Override
     public E next() {
@@ -98,11 +98,11 @@ final class HashIterator<E> implements Iterator<E> {
     }
 
     /**
-     * Removes from the underlying set the last element returned by this iterator[cite: 8].
+     * Removes from the underlying set the last element returned by this iterator.
      *
      * @throws IllegalStateException           if {@link #next()} has not yet been called, or {@code remove()}
-     *                                         has already been called after the last call to {@code next()}[cite: 8]
-     * @throws ConcurrentModificationException if the backing set was structurally modified concurrently[cite: 8]
+     *                                         has already been called after the last call to {@code next()}
+     * @throws ConcurrentModificationException if the backing set was structurally modified concurrently
      */
     @Override
     public void remove() {
@@ -124,7 +124,7 @@ final class HashIterator<E> implements Iterator<E> {
 
     /**
      * Advances the bucket cursor to the next non-empty slot in the hash table,
-     * initializing either a direct node pointer or a localized key snapshot for tree bins[cite: 8].
+     * initializing either a direct node pointer or a localized key snapshot for tree bins.
      */
     private void advanceToNextBucket() {
         Node<E>[] tab = set.table;
@@ -156,9 +156,9 @@ final class HashIterator<E> implements Iterator<E> {
     }
 
     /**
-     * Verifies that the backing set has not been structurally modified outside of this iterator[cite: 8].
+     * Verifies that the backing set has not been structurally modified outside of this iterator.
      *
-     * @throws ConcurrentModificationException if {@code set.modCount} does not match {@code expectedModCount}[cite: 8]
+     * @throws ConcurrentModificationException if {@code set.modCount} does not match {@code expectedModCount}.
      */
     private void checkForComodification() {
         if (set.modCount != expectedModCount) {

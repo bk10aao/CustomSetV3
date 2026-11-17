@@ -182,12 +182,11 @@ final class TreeNode<E> extends Node<E> {
         if (replacement == nodeToDelete) {
             TreeNode<E> pp = nodeToDelete.parent;
             nodeToDelete.parent = null;
-            if (pp != null) {
+            if (pp != null)
                 if (nodeToDelete == pp.left)
                     pp.left = null;
                 else if (nodeToDelete == pp.right)
                     pp.right = null;
-            }
         }
         moveRootToFront(tab, r);
     }
