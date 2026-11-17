@@ -5,22 +5,15 @@ import java.io.InvalidObjectException;
 import java.io.ObjectInputStream;
 import java.io.Serial;
 import java.io.Serializable;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
 import java.util.Collection;
-import java.util.ConcurrentModificationException;
 import java.util.Iterator;
-import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Set;
 import java.util.Spliterator;
-import java.util.function.Consumer;
 
 import static java.lang.reflect.Array.newInstance;
-import static java.lang.System.identityHashCode;
 import static java.util.Arrays.fill;
 import static java.util.Objects.requireNonNull;
-import static java.util.Objects.requireNonNullElse;
-import static java.util.Objects.requireNonNullElseGet;
 
 /**
  * A specialized, high-performance hash-backed set implementation that mimics
@@ -37,34 +30,34 @@ import static java.util.Objects.requireNonNullElseGet;
  * preserving identical asymptotic Big-O time and space complexity.
  *
  * @param <E> the type of elements maintained by this set
- * @see java.util.Set
- * @see java.util.HashSet
  * @author Benjamin Kane
  * LinkedIn - <a href="https://www.linkedin.com/in/benjamin-kane-81149482/"/>
  * GitHub account bk10aao - <a href="https://github.com/bk10aao"/>
  * Repository - <a href="https://github.com/bk10aao/CustomSetV3"/>
+ * @see java.util.Set
+ * @see java.util.HashSet
  */
-public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
+public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
 
+    //TODO, check retainAll performance
     @Serial
     private static final long serialVersionUID = 1L;
 
-    private boolean containsNull = false;
-    private int size;
+    transient boolean containsNull = false;
     private int threshold;
-
     private final float loadFactor;
-
     private static final int DEFAULT_INITIAL_CAPACITY = 16;
     private static final int HASH_BITS_TO_SHIFT = 16;
     private static final int MAXIMUM_CAPACITY = 1 << 30;
     private static final int MIN_TREEIFY_CAPACITY = 64;
-    private static final int TREEIFY_THRESHOLD   = 8;
-    private static final int UNTREEIFY_THRESHOLD = 6;
+    static final int TREEIFY_THRESHOLD = 8;
+    static final int UNTREEIFY_THRESHOLD = 6;
     private static final float DEFAULT_LOAD_FACTOR = 0.75f;
 
-    private transient int modCount = 0;
-    private transient Node<E>[] table;
+    transient int modCount = 0;
+    transient Node<E>[] table;
+
+    int size;
 
     /**
      * Constructs a new, empty set with an initial capacity of 16 and a default load factor of 0.75.
@@ -107,8 +100,12 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
      * @throws NullPointerException if the specified collection is null
      */
     public CustomSet(final Collection<? extends E> c) {
-        this(Math.max((int) (requireNonNull(c).size() / DEFAULT_LOAD_FACTOR) + 1, DEFAULT_INITIAL_CAPACITY),
-                DEFAULT_LOAD_FACTOR);
+        requireNonNull(c, "Collection must not be null.");
+        long required = (long) (c.size() / (double) DEFAULT_LOAD_FACTOR) + 1;
+        int capacity = tableSizeFor((int) Math.min(required, MAXIMUM_CAPACITY));
+        capacity = Math.max(capacity, DEFAULT_INITIAL_CAPACITY);
+        this.loadFactor = DEFAULT_LOAD_FACTOR;
+        this.threshold = capacity;
         addAll(c);
     }
 
@@ -144,7 +141,7 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
      * @throws NullPointerException if the specified collection is null
      */
     public boolean addAll(final Collection<? extends E> c) {
-        requireNonNull(c);
+        requireNonNull(c, "Collection must not be null.");
         if (c.isEmpty())
             return false;
         int initialSize = size;
@@ -163,12 +160,37 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
     public CustomSet<E> clone() {
         try {
             CustomSet<E> copy = (CustomSet<E>) super.clone();
-            copy.table = (Node<E>[]) new Node[table.length];
-            copy.size = 0;
-            copy.containsNull = false;
             copy.modCount = 0;
-            copy.setThreshold(copy.table.length);
-            copy.addAll(this);
+            if (table == null) {
+                copy.table = null;
+                return copy;
+            }
+            Node<E>[] src = table, dst = (Node<E>[]) new Node[src.length];
+            copy.table = dst;
+            for (int i = 0; i < src.length; i++) {
+                Node<E> n = src[i];
+                if (n == null)
+                    continue;
+                if (n instanceof TreeNode) {
+                    TreeNode<E> head = new TreeNode<>(n.hash, n.key, null), tail = head;
+                    for (n = n.next; n != null; n = n.next) {
+                        TreeNode<E> c = new TreeNode<>(n.hash, n.key, null);
+                        c.previous = tail;
+                        tail.next = c;
+                        tail = c;
+                    }
+                    dst[i] = head;
+                    head.treeify(dst);
+                } else {
+                    Node<E> head = new Node<>(n.hash, n.key, null), tail = head;
+                    for (n = n.next; n != null; n = n.next) {
+                        Node<E> c = new Node<>(n.hash, n.key, null);
+                        tail.next = c;
+                        tail = c;
+                    }
+                    dst[i] = head;
+                }
+            }
             return copy;
         } catch (CloneNotSupportedException e) {
             throw new InternalError(e);
@@ -192,9 +214,11 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
         Node<E> first = tab[index];
         if (first == null)
             return false;
+        if (first.hash == hash && keysMatch(o, first))
+            return true;
         if (first instanceof TreeNode)
             return ((TreeNode<E>) first).getTreeNode(hash, o) != null;
-        for (Node<E> node = first; node != null; node = node.next)
+        for (Node<E> node = first.next; node != null; node = node.next)
             if (node.hash == hash && keysMatch(o, node))
                 return true;
         return false;
@@ -280,7 +304,7 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
      * @return an iterator over the elements in this set
      */
     public Iterator<E> iterator() {
-        return new HashIterator();
+        return new HashIterator<>(this);
     }
 
     /**
@@ -341,14 +365,15 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
      * @throws NullPointerException if the specified collection is null
      */
     public boolean retainAll(final Collection<?> c) {
-        requireNonNull(c, "Collection must not be null");
+        requireNonNull(c, "Collection must not be null.");
         if (size == 0)
             return false;
+        final Collection<?> retainValues = (c instanceof Set) ? c : new CustomSet<>(c);
         boolean modified = false;
         Iterator<E> it = iterator();
         while (it.hasNext()) {
             E element = it.next();
-            if (!c.contains(element)) {
+            if (!retainValues.contains(element)) {
                 it.remove();
                 modified = true;
             }
@@ -403,14 +428,14 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
      * Returns an array containing all the elements in this set; the runtime type of
      * the returned array is that of the specified array.
      *
-     * @param a the array into which the elements of this set are to be stored, if it is big enough;
-     *          otherwise, a new array of the same runtime type is allocated for this purpose
+     * @param a   the array into which the elements of this set are to be stored, if it is big enough;
+     *            otherwise, a new array of the same runtime type is allocated for this purpose
      * @param <T> the runtime type of the array to contain the collection
      * @return an array containing all the elements in this set
      * @throws NullPointerException if the specified array is null
      */
     public <T> T[] toArray(final T[] a) {
-        requireNonNull(a);
+        requireNonNull(a, "Array must not be null.");
         T[] arr = a.length < size ? (T[]) newInstance(a.getClass().getComponentType(), size) : a;
         int index = 0;
         if (containsNull)
@@ -428,29 +453,32 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
 
     /**
      * Returns a string representation of this set. The string representation consists of a list
-     * of the set's elements enclosed in square brackets or braces depending on formatting.
+     * of the set's elements in the order they are returned by its iterator, enclosed in square
+     * brackets ({@code "[]"}). Adjacent elements are separated by the characters {@code ", "}
+     * (comma and space).
      *
      * @return a string representation of this set
      */
     @Override
     public String toString() {
         if (size == 0)
-            return "{}";
-        StringBuilder sb = new StringBuilder("{");
+            return "[]";
+        StringBuilder sb = new StringBuilder((int) Math.min(1 << 20, Math.max(16L, size * 8L))).append('[');
         boolean first = true;
         if (containsNull) {
             sb.append("null");
             first = false;
         }
-        for (Node<E> node : table)
-            while (node != null) {
-                if (!first)
-                    sb.append(", ");
-                sb.append(node.key);
-                node = node.next;
-                first = false;
-            }
-        return sb.append("}").toString();
+        if (table != null)
+            for (Node<E> node : table)
+                while (node != null) {
+                    if (!first)
+                        sb.append(", ");
+                    sb.append(node.key);
+                    node = node.next;
+                    first = false;
+                }
+        return sb.append("]").toString();
     }
 
     private boolean addNullElement() {
@@ -463,15 +491,16 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
     }
 
     private void ensureCapacity(final int additional) {
-        long required = (long)((size + (long) additional ) / (double) loadFactor) + 1;
-        int target = tableSizeFor((int)Math.min(required, MAXIMUM_CAPACITY));
-        int currentCapacity = (table == null) ? 0 : table.length;
+        long required = (long) ((size + (long) additional) / (double) loadFactor) + 1;
+        int target = tableSizeFor((int) Math.min(required, MAXIMUM_CAPACITY));
+        int currentCapacity = (table == null) ? threshold : table.length;
         if (target > currentCapacity)
             resize(target);
     }
 
-    private static <E> boolean keysMatch(Object target, Node<E> node) {
-        return node.key == target || node.key.equals(target);
+    static <E> boolean keysMatch(Object target, Node<E> node) {
+        E key = node.key;
+        return Objects.equals(key, target);
     }
 
     @Serial
@@ -498,51 +527,47 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
         Node<E>[] oldTable = table;
         int oldCapacity = (oldTable == null) ? 0 : oldTable.length;
         Node<E>[] newTable = (Node<E>[]) new Node[newCapacity];
-
         table = newTable;
         setThreshold(newCapacity);
-
-        if (oldTable != null && size > 0)
-            for (int i = 0; i < oldCapacity; ++i) {
-                Node<E> entry = oldTable[i];
-                if (entry != null) {
-                    oldTable[i] = null;
-                    if (entry.next == null)
-                        newTable[entry.hash & (newCapacity - 1)] = entry;
-                    else if (entry instanceof TreeNode)
-                        ((TreeNode<E>) entry).split(newTable, i, oldCapacity);
-                    else {
-                        Node<E> lowHead = null, lowTail = null;
-                        Node<E> highHead = null, highTail = null;
-                        Node<E> nextEntry;
-                        do {
-                            nextEntry = entry.next;
-                            if ((entry.hash & oldCapacity) == 0) {
-                                if (lowTail == null)
-                                    lowHead = entry;
-                                else
-                                    lowTail.next = entry;
-                                lowTail = entry;
-                            } else {
-                                if (highTail == null)
-                                    highHead = entry;
-                                else
-                                    highTail.next = entry;
-                                highTail = entry;
-                            }
-                        } while ((entry = nextEntry) != null);
-
-                        if (lowTail != null) {
-                            lowTail.next = null;
-                            newTable[i] = lowHead;
-                        }
-                        if (highTail != null) {
-                            highTail.next = null;
-                            newTable[i + oldCapacity] = highHead;
-                        }
-                    }
-                }
+        if (oldTable != null && size > 0) {
+            if (newCapacity == oldCapacity << 1) {
+                transferBins(oldTable, newTable, oldCapacity);
+                return;
             }
+            int mask = newCapacity - 1;
+            boolean canTreeify = newCapacity >= MIN_TREEIFY_CAPACITY;
+            Node<E>[] tails = (Node<E>[]) new Node[newCapacity];
+            for (int i = 0; i < oldCapacity; i++) {
+                Node<E> node = oldTable[i];
+                if (node == null)
+                    continue;
+                oldTable[i] = null;
+                int count = 0;
+                while (node != null) {
+                    Node<E> next = node.next;
+                    Node<E> entry = (node instanceof TreeNode)
+                            ? new Node<>(node.hash, node.key, null)
+                            : node;
+                    entry.next = null;
+                    int index = entry.hash & mask;
+                    if (tails[index] == null)
+                        newTable[index] = entry;
+                    else
+                        tails[index].next = entry;
+                    tails[index] = entry;
+                    node = next;
+                    count++;
+                }
+                if (canTreeify && count > TREEIFY_THRESHOLD)
+                    for (int j = i; j < newCapacity; j += oldCapacity) {
+                        int binCount = 0;
+                        for (Node<E> n = newTable[j]; n != null && binCount <= TREEIFY_THRESHOLD; n = n.next)
+                            binCount++;
+                        if (binCount > TREEIFY_THRESHOLD)
+                            treeifyBin(newTable, j);
+                    }
+            }
+        }
     }
 
     private Node<E>[] expand() {
@@ -558,7 +583,7 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
             if (newCapacity > MAXIMUM_CAPACITY)
                 newCapacity = MAXIMUM_CAPACITY;
         } else
-            newCapacity = DEFAULT_INITIAL_CAPACITY;
+            newCapacity = threshold > 0 ? threshold : DEFAULT_INITIAL_CAPACITY;
         Node<E>[] newTable = (Node<E>[]) new Node[newCapacity];
         table = newTable;
         setThreshold(newCapacity);
@@ -579,10 +604,9 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
     }
 
     private boolean insertValue(final Node<E>[] tab, final Node<E> first, final int index, final int hash, final E e) {
-        if (first instanceof TreeNode) {
-            TreeNode<E> existing = ((TreeNode<E>) first).putTreeVal(tab, hash, e);
-            return existing == null;
-        } else {
+        if (first instanceof TreeNode)
+            return ((TreeNode<E>) first).putTreeVal(tab, hash, e) == null;
+        else {
             Node<E> current = first;
             int binCount = 0;
             while (true) {
@@ -675,9 +699,7 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
                 else if (entry instanceof TreeNode)
                     ((TreeNode<E>) entry).split(newTable, i, oldCapacity);
                 else {
-                    Node<E> lowHead = null, lowTail = null;
-                    Node<E> highHead = null, highTail = null;
-                    Node<E> nextEntry;
+                    Node<E> lowHead = null, lowTail = null, highHead = null, highTail = null, nextEntry;
                     do {
                         nextEntry = entry.next;
                         if ((entry.hash & oldCapacity) == 0) {
@@ -736,929 +758,14 @@ public class CustomSet<E> implements Set<E>, Cloneable, Serializable {
         s.defaultWriteObject();
         s.writeInt(table == null ? 0 : table.length);
         s.writeInt(size);
-        for (E e : this)
-            s.writeObject(e);
-    }
-
-    /**
-     * An iterator over the elements in this set, traversing hash table collision chains
-     * as well as handling the specialized {@code null} element storage.
-     *
-     * <p>This iterator is fail-fast and throws a {@link ConcurrentModificationException}
-     * if the set is structurally modified at any time after the iterator is created,
-     * except through the iterator's own {@link #remove()} method.
-     */
-    private class HashIterator implements Iterator<E> {
-
-        private Node<E> current;
-        private Node<E> next;
-        private int index;
-        private boolean includeNull;
-        private boolean removeNull;
-
-        private int expectedModCount;
-
-        /**
-         * Constructs a new {@code HashIterator}, initializing state to track modCount,
-         * checking for a stored {@code null} element, and advancing to the first non-empty bucket.
-         */
-        private HashIterator() {
-            expectedModCount = modCount;
-            includeNull = containsNull;
-            Node<E>[] tab = table;
-            if (tab != null && size > 0)
-                while (index < tab.length && (next = tab[index++]) == null) { }
+        if (containsNull) {
+            s.writeObject(null);
         }
-
-        /**
-         * Returns {@code true} if the iteration has more elements.
-         *
-         * @return {@code true} if the iteration has more elements
-         */
-        public boolean hasNext() {
-            return includeNull || next != null;
-        }
-
-        /**
-         * Returns the next element in the iteration.
-         *
-         * @return the next element in the iteration
-         * @throws NoSuchElementException if the iteration has no more elements
-         * @throws ConcurrentModificationException if the set was structurally modified concurrently
-         */
-        public E next() {
-            checkForComodification();
-            if (includeNull) {
-                includeNull = false;
-                removeNull = true;
-                current = null;
-                return null;
-            }
-            Node<E> e = next;
-            if (e == null)
-                throw new NoSuchElementException();
-            removeNull = false;
-            current = e;
-            Node<E>[] tab = table;
-            if ((next = e.next) == null && tab != null)
-                while (index < tab.length && (next = tab[index++]) == null) { }
-            return e.key;
-        }
-
-        /**
-         * Removes from the underlying set the last element returned by this iterator.
-         * This method can be called only once per call to {@link #next()}.
-         *
-         * @throws IllegalStateException if the {@code next} method has not yet been called,
-         *                               or the {@code remove} method has already been called after
-         *                               the last call to the {@code next} method
-         * @throws ConcurrentModificationException if the set was structurally modified concurrently
-         */
-        public void remove() {
-            checkForComodification();
-            if (removeNull) {
-                removeNull = false;
-                CustomSet.this.remove(null);
-            } else if (current != null) {
-                Object key = current.key;
-                current = null;
-                CustomSet.this.remove(key);
-            } else
-                throw new IllegalStateException();
-            expectedModCount = modCount;
-        }
-
-        private void checkForComodification() {
-            if (modCount != expectedModCount)
-                throw new ConcurrentModificationException();
-        }
-    }
-
-    /**
-     * Basic collision chain node stored directly within hash table buckets.
-     *
-     * <p>Each node holds an element key, its cached hash code, and a reference
-     * to the next node in the singly-linked collision chain.
-     *
-     * @param <E> the type of element stored in this node
-     */
-    private static class Node<E> {
-
-        final int hash;
-        final E key;
-        Node<E> next;
-
-        /**
-         * Constructs a new collision chain node.
-         *
-         * @param hash the cached hash code of the key
-         * @param key  the element key stored in this node
-         * @param next the next node in the collision chain bucket, or {@code null} if none
-         */
-        private Node(final int hash, final E key, final Node<E> next) {
-            this.hash = hash;
-            this.key = key;
-            this.next = next;
-        }
-
-        /**
-         * Returns a string representation of the stored element key.
-         *
-         * @return the string value of the key, or {@code "null"} if the key is {@code null}
-         */
-        @Override
-        public final String toString() {
-            return String.valueOf(key);
-        }
-    }
-
-    /**
-     * A specialized node implementation used for self-balancing Red-Black tree bins
-     * when collision chain occupancy exceeds {@link CustomSet#TREEIFY_THRESHOLD}.
-     *
-     * <p>Extending base {@link Node}, {@code TreeNode} maintains tree pointers (left, right,
-     * parent), a color flag ({@code isRed}), and dual linked-list tracking pointers
-     * ({@code previous}) to support simultaneous tree navigation, sequential iteration,
-     * and splitting operations during table resizing.
-     *
-     * @param <E> the type of element stored in this tree node
-     */
-    private static final class TreeNode<E> extends Node<E> {
-
-        private TreeNode<E> left;
-        private TreeNode<E> right;
-        private TreeNode<E> parent;
-        private TreeNode<E> previous;
-        private boolean isRed;
-
-        /**
-         * Constructs a new Red-Black tree node.
-         *
-         * @param hash the cached hash code of the key
-         * @param key  the element key stored in this node
-         * @param next the next node in the collision chain, or {@code null} if none
-         */
-        private TreeNode(final int hash, final E key, final Node<E> next) {
-            super(hash, key, next);
-        }
-
-        /**
-         * Re-balances the Red-Black tree after a node deletion.
-         *
-         * @param root      the current root of the tree
-         * @param fixupNode the node that replaced the deleted node (or the deleted node itself if it was a leaf)
-         * @return the new root of the tree
-         */
-        private static <E> TreeNode<E> balanceDeletion(TreeNode<E> root, TreeNode<E> fixupNode) {
-            for (TreeNode<E> parentNode, parentLeftChild, parentRightChild; ; ) {
-                if (fixupNode == null || fixupNode == root)
-                    return root;
-                if ((parentNode = fixupNode.parent) == null) {
-                    fixupNode.isRed = false;
-                    return fixupNode;
+        if (table != null && size > 0)
+            for (Node<E> node : table)
+                while (node != null) {
+                    s.writeObject(node.key);
+                    node = node.next;
                 }
-                if (fixupNode.isRed) {
-                    fixupNode.isRed = false;
-                    return root;
-                }
-                if ((parentLeftChild = parentNode.left) == fixupNode) {
-                    if ((parentRightChild = parentNode.right) != null && parentRightChild.isRed) {
-                        parentRightChild.isRed = false;
-                        parentNode.isRed  = true;
-                        root = rotateLeft(root, parentNode);
-                        parentRightChild = (parentNode = fixupNode.parent) == null ? null : parentNode.right;
-                    }
-
-                    if (parentRightChild == null)
-                        fixupNode = parentNode;
-                    else {
-                        TreeNode<E> siblingLeft = parentRightChild.left, siblingRight = parentRightChild.right;
-                        if ((siblingRight == null || !siblingRight.isRed) && (siblingLeft == null || !siblingLeft.isRed)) {
-                            parentRightChild.isRed = true;
-                            fixupNode = parentNode;
-                        } else {
-                            if (siblingRight == null || !siblingRight.isRed) {
-                                if (siblingLeft != null)
-                                    siblingLeft.isRed = false;
-                                parentRightChild.isRed = true;
-                                root = rotateRight(root, parentRightChild);
-                                parentRightChild = (parentNode = fixupNode.parent) == null ? null : parentNode.right;
-                            }
-                            if (parentRightChild != null) {
-                                parentRightChild.isRed = parentNode.isRed;
-                                if ((siblingRight = parentRightChild.right) != null)
-                                    siblingRight.isRed = false;
-                            }
-                            if (parentNode != null) {
-                                parentNode.isRed = false;
-                                root = rotateLeft(root, parentNode);
-                            }
-                            fixupNode = root;
-                        }
-                    }
-                } else {
-                    if (parentLeftChild != null && parentLeftChild.isRed) {
-                        parentLeftChild.isRed = false;
-                        parentNode.isRed  = true;
-                        root = rotateRight(root, parentNode);
-                        parentLeftChild = (parentNode = fixupNode.parent) == null ? null : parentNode.left;
-                    }
-                    if (parentLeftChild == null)
-                        fixupNode = parentNode;
-                    else {
-                        TreeNode<E> siblingLeft = parentLeftChild.left, siblingRight = parentLeftChild.right;
-                        if ((siblingLeft == null || !siblingLeft.isRed) && (siblingRight == null || !siblingRight.isRed)) {
-                            parentLeftChild.isRed = true;
-                            fixupNode = parentNode;
-                        } else {
-                            if (siblingLeft == null || !siblingLeft.isRed) {
-                                if (siblingRight != null)
-                                    siblingRight.isRed = false;
-                                parentLeftChild.isRed = true;
-                                root = rotateLeft(root, parentLeftChild);
-                                parentLeftChild = (parentNode = fixupNode.parent) == null ? null : parentNode.left;
-                            }
-                            if (parentLeftChild != null) {
-                                parentLeftChild.isRed = parentNode.isRed;
-                                if ((siblingLeft = parentLeftChild.left) != null)
-                                    siblingLeft.isRed = false;
-                            }
-                            if (parentNode != null) {
-                                parentNode.isRed = false;
-                                root = rotateRight(root, parentNode);
-                            }
-                            fixupNode = root;
-                        }
-                    }
-                }
-            }
-        }
-
-        /**
-         * Re-balances the Red-Black tree after a new node insertion.
-         *
-         * @param root        the root of the tree
-         * @param currentNode the newly inserted node
-         * @return the updated root of the tree
-         */
-        private static <E> TreeNode<E> balanceInsertion(TreeNode<E> root, TreeNode<E> currentNode) {
-            currentNode.isRed = true;
-            for (TreeNode<E> parentNode, grandparentNode, grandparentLeft, grandparentRight; ; ) {
-                if ((parentNode = currentNode.parent) == null) {
-                    currentNode.isRed = false;
-                    return currentNode;
-                } else if (!parentNode.isRed || (grandparentNode = parentNode.parent) == null)
-                    return root;
-                if (parentNode == grandparentNode.left)
-                    if ((grandparentRight = grandparentNode.right) != null && grandparentRight.isRed) {
-                        grandparentRight.isRed = false;
-                        parentNode.isRed = false;
-                        grandparentNode.isRed = true;
-                        currentNode = grandparentNode;
-                    } else {
-                        if (currentNode == parentNode.right) {
-                            root = rotateLeft(root, currentNode = parentNode);
-                            grandparentNode = (parentNode = currentNode.parent) == null ? null : parentNode.parent;
-                        }
-                        if (parentNode != null) {
-                            parentNode.isRed = false;
-                            if (grandparentNode != null) {
-                                grandparentNode.isRed = true;
-                                root = rotateRight(root, grandparentNode);
-                            }
-                        }
-                        return root;
-                    }
-                else if ((grandparentLeft = grandparentNode.left) != null && grandparentLeft.isRed) {
-                    grandparentLeft.isRed = false;
-                    parentNode.isRed = false;
-                    grandparentNode.isRed = true;
-                    currentNode = grandparentNode;
-                } else {
-                    if (currentNode == parentNode.left) {
-                        root = rotateRight(root, currentNode = parentNode);
-                        grandparentNode = (parentNode = currentNode.parent) == null ? null : parentNode.parent;
-                    }
-                    if (parentNode != null) {
-                        parentNode.isRed = false;
-                        if (grandparentNode != null) {
-                            grandparentNode.isRed = true;
-                            root = rotateLeft(root, grandparentNode);
-                        }
-                    }
-                    return root;
-                }
-            }
-        }
-
-        /**
-         * Compares two tree node entries by hash code, comparable interface, or tie-breaker order.
-         *
-         * @param hash1 the hash code of the first value
-         * @param hash2 the hash code of the second value
-         * @param v1    the first value object
-         * @param v2    the second value object
-         * @return a negative integer, zero, or a positive integer as the first value is less than, equal to, or greater than the second
-         */
-        private static int compare(final int hash1, final int hash2, final Object v1, final Object v2) {
-            if (hash1 != hash2)
-                return hash1 < hash2 ? -1 : 1;
-            Class<?> kc = comparableClassFor(v1);
-            int cmp;
-            if (kc != null && (cmp = compareComparables(kc, v1, v2)) != 0)
-                return cmp;
-            return tieBreakOrder(v1, v2);
-        }
-
-        /**
-         * Returns the comparable class for the specified object if it implements {@link Comparable} directly.
-         *
-         * @type x the object to inspect
-         * @return the comparable class type, or {@code null} if none
-         */
-        private static Class<?> comparableClassFor(final Object x) {
-            if (x instanceof Comparable) {
-                Class<?> c = x.getClass();
-                if (c == String.class)
-                    return c;
-                for (Type t : c.getGenericInterfaces())
-                    if (t instanceof ParameterizedType p && p.getRawType() == Comparable.class) {
-                        Type[] args = p.getActualTypeArguments();
-                        if (args.length == 1 && args[0] == c)
-                            return c;
-                    }
-            }
-            return null;
-        }
-
-        /**
-         * Compares two comparable objects of the specified class type.
-         *
-         * @param kc the comparable class type
-         * @param k  the first comparable object
-         * @param x  the second object to compare against
-         * @return a negative integer, zero, or a positive integer
-         */
-        private static int compareComparables(final Class<?> kc, final Object k, final Object x) {
-            return(x == null || x.getClass() != kc) ? 0 : ((Comparable)k).compareTo(x);
-        }
-
-        /**
-         * Finds and returns the tree node matching the specified hash and target object.
-         *
-         * @param hash   the hash code of the target object
-         * @param target the target object to search for
-         * @param kc     the comparable class type, if applicable
-         * @return the matching {@code TreeNode}, or {@code null} if not found
-         */
-        private TreeNode<E> find(final int hash, final Object target, Class<?> kc) {
-            TreeNode<E> p = this;
-            do {
-                TreeNode<E> pl = p.left, pr = p.right, q;
-                int dir;
-                if (p.hash > hash)
-                    p = pl;
-                else if (p.hash < hash)
-                    p = pr;
-                else if (p.key == target || p.key.equals(target))
-                    return p;
-                else if (pl == null)
-                    p = pr;
-                else if (pr == null)
-                    p = pl;
-                else if ((kc != null || (kc = comparableClassFor(target)) != null)
-                        && (dir = compareComparables(kc, target, p.key)) != 0)
-                    p = (dir < 0) ? pl : pr;
-                else if ((q = pr.find(hash, target, kc)) != null)
-                    return q;
-                else
-                    p = pl;
-            } while (p != null);
-            return null;
-        }
-
-        /**
-         * Retrieves the tree node matching the specified hash and object key from the tree root.
-         *
-         * @param hash the hash code of the object
-         * @param o    the object key to search for
-         * @return the matching tree node, or {@code null} if not present
-         */
-        private TreeNode<?> getTreeNode(final int hash, final Object o) {
-            return((parent != null) ? root() : this).find(hash, o, null);
-        }
-
-        /**
-         * Ensures that the given root node of a red-black tree bin is placed at the front
-         * of the bucket's collision chain in the table.
-         *
-         * @param tab  the hash table array
-         * @param root the root node of the tree
-         */
-        private static <E> void moveRootToFront(final Node<E>[] tab, final TreeNode<E> root) {
-            int n;
-            if (root != null && tab != null && (n = tab.length) > 0) {
-                int index = (n - 1) & root.hash;
-                TreeNode<E> first = (TreeNode<E>) tab[index];
-                if (root != first) {
-                    Node<E> rootNext;
-                    tab[index] = root;
-                    TreeNode<E> rootPrevious = root.previous;
-                    if ((rootNext = root.next) != null)
-                        ((TreeNode<E>) rootNext).previous = rootPrevious;
-                    if (rootPrevious != null)
-                        rootPrevious.next = rootNext;
-                    if (first != null)
-                        first.previous = root;
-                    root.next = first;
-                    root.previous = null;
-                }
-            }
-        }
-
-        /**
-         * Inserts a value into the Red-Black tree bin, treeifying or balancing as necessary.
-         *
-         * @param tab   the hash table array
-         * @param hash  the hash code of the value
-         * @param value the element value to insert
-         * @return the existing tree node if already present, or {@code null} upon successful insertion
-         */
-        private TreeNode<E> putTreeVal(final Node<E>[] tab, final int hash, final E value) {
-            Class<?> kc = null;
-            boolean searched = false;
-            TreeNode<E> root = (parent != null) ? root() : this;
-            for (TreeNode<E> p = root; ; ) {
-                int dir;
-                if (p.hash > hash)
-                    dir = -1;
-                else if (p.hash < hash)
-                    dir = 1;
-                else if (p.key == value || value.equals(p.key))
-                    return p;
-                else if ((kc == null && (kc = comparableClassFor(value)) == null)
-                        || (dir = compareComparables(kc, value, p.key)) == 0) {
-                    if (!searched) {
-                        TreeNode<E> q, ch;
-                        searched = true;
-                        if (((ch = p.left) != null && (q = ch.find(hash, value, kc)) != null)
-                                || ((ch = p.right) != null && (q = ch.find(hash, value, kc)) != null))
-                            return q;
-                    }
-                    dir = tieBreakOrder(value, p.key);
-                }
-                TreeNode<E> parentOfNewNode = p;
-                if ((p = (dir <= 0) ? p.left : p.right) == null) {
-                    Node<E> nextAfterInsertion = parentOfNewNode.next;
-                    TreeNode<E> newNode = new TreeNode<>(hash, value, nextAfterInsertion);
-                    if (dir <= 0)
-                        parentOfNewNode.left = newNode;
-                    else
-                        parentOfNewNode.right = newNode;
-                    parentOfNewNode.next = newNode;
-                    newNode.parent = newNode.previous = parentOfNewNode;
-                    if (nextAfterInsertion != null)
-                        ((TreeNode<E>) nextAfterInsertion).previous = newNode;
-                    moveRootToFront(tab, balanceInsertion(root, newNode));
-                    return null;
-                }
-            }
-        }
-
-        /**
-         * Removes this node from the Red-Black tree, maintains the secondary
-         * linked-list view, rebalances, and converts back to a plain list
-         * when the remaining tree falls below the untreeify threshold.
-         *
-         * @param tab the hash table array
-         */
-        private void removeTreeNode(final Node<E>[] tab) {
-            int tableLength;
-            if (tab == null || (tableLength = tab.length) == 0)
-                return;
-            final int index = (tableLength - 1) & hash;
-            TreeNode<E> first = (TreeNode<E>) tab[index];
-            TreeNode<E> root  = first;
-            TreeNode<E> nextLinkedNode  = (TreeNode<E>) next;
-            TreeNode<E> previousLinkedNode  = previous;
-            if (previousLinkedNode == null)
-                tab[index] = first = nextLinkedNode;
-            else
-                previousLinkedNode.next = nextLinkedNode;
-            if (nextLinkedNode != null)
-                nextLinkedNode.previous = previousLinkedNode;
-            if (first == null)
-                return;
-            if (root.parent != null)
-                root = root.root();
-            TreeNode<E> rl;
-            if (root.right == null || (rl = root.left) == null || rl.left == null) {
-                tab[index] = first.untreeify();
-                return;
-            }
-            TreeNode<E> nodeToDelete = this;
-            TreeNode<E> leftChild = left;
-            TreeNode<E> rightChild = right;
-            TreeNode<E> replacement;
-            if (leftChild != null && rightChild != null) {
-                TreeNode<E> inOrderSuccessor = rightChild;
-                for (TreeNode<E> successorLeft; (successorLeft = inOrderSuccessor.left) != null; )
-                    inOrderSuccessor = successorLeft;
-                boolean swappedColor = inOrderSuccessor.isRed;
-                inOrderSuccessor.isRed = nodeToDelete.isRed;
-                nodeToDelete.isRed = swappedColor;
-                TreeNode<E> successorRight = inOrderSuccessor.right;
-                TreeNode<E> parentNode = nodeToDelete.parent;
-                if (inOrderSuccessor == rightChild) {
-                    nodeToDelete.parent = inOrderSuccessor;
-                    inOrderSuccessor.right  = nodeToDelete;
-                } else {
-                    TreeNode<E> successorParent = inOrderSuccessor.parent;
-                    if ((nodeToDelete.parent = successorParent) != null)
-                        if (inOrderSuccessor == successorParent.left)
-                            successorParent.left  = nodeToDelete;
-                        else
-                            successorParent.right = nodeToDelete;
-                    if ((inOrderSuccessor.right = rightChild) != null)
-                        rightChild.parent = inOrderSuccessor;
-                }
-                nodeToDelete.left = null;
-                if ((nodeToDelete.right = successorRight) != null)
-                    successorRight.parent = nodeToDelete;
-                if ((inOrderSuccessor.left = leftChild) != null)
-                    leftChild.parent = inOrderSuccessor;
-                if ((inOrderSuccessor.parent = parentNode) == null)
-                    root = inOrderSuccessor;
-                else if (nodeToDelete == parentNode.left)
-                    parentNode.left  = inOrderSuccessor;
-                else
-                    parentNode.right = inOrderSuccessor;
-                replacement = (successorRight != null) ? successorRight : nodeToDelete;
-            }
-            else
-                replacement = requireNonNullElseGet(leftChild, () -> requireNonNullElse(rightChild, nodeToDelete));
-            if (replacement != nodeToDelete) {
-                TreeNode<E> pp = replacement.parent = nodeToDelete.parent;
-                if (pp == null)
-                    root = replacement;
-                else if (nodeToDelete == pp.left)
-                    pp.left  = replacement;
-                else
-                    pp.right = replacement;
-                nodeToDelete.left = nodeToDelete.right = nodeToDelete.parent = null;
-            }
-            TreeNode<E> r = nodeToDelete.isRed ? root : balanceDeletion(root, replacement);
-            if (replacement == nodeToDelete) {
-                TreeNode<E> pp = nodeToDelete.parent;
-                nodeToDelete.parent = null;
-                if (pp != null) {
-                    if (nodeToDelete == pp.left)
-                        pp.left  = null;
-                    else if (nodeToDelete == pp.right)
-                        pp.right = null;
-                }
-            }
-            moveRootToFront(tab, r);
-        }
-
-        /**
-         * Traverses parent links to find and return the root node of this Red-Black tree.
-         *
-         * @return the root node of the tree
-         */
-        private TreeNode<E> root() {
-            TreeNode<E> r = this;
-            while (r.parent != null)
-                r = r.parent;
-            return r;
-        }
-
-        /**
-         * Performs a left rotation on the Red-Black tree around the specified pivot node.
-         *
-         * @param root      the current root of the tree
-         * @param pivotNode the pivot node for rotation
-         * @return the new root of the tree
-         */
-        private static <E> TreeNode<E> rotateLeft(TreeNode<E> root, final TreeNode<E> pivotNode) {
-            TreeNode<E> rightChild = pivotNode.right;
-            pivotNode.right = rightChild.left;
-            if (rightChild.left != null)
-                rightChild.left.parent = pivotNode;
-            rightChild.parent = pivotNode.parent;
-            if (pivotNode.parent == null)
-                root = rightChild;
-            else if (pivotNode.parent.left == pivotNode)
-                pivotNode.parent.left = rightChild;
-            else
-                pivotNode.parent.right = rightChild;
-            rightChild.left = pivotNode;
-            pivotNode.parent = rightChild;
-            return root;
-        }
-
-        /**
-         * Performs a right rotation on the Red-Black tree around the specified pivot node.
-         *
-         * @param root      the current root of the tree
-         * @param pivotNode the pivot node for rotation
-         * @return the new root of the tree
-         */
-        private static <E> TreeNode<E> rotateRight(TreeNode<E> root, final TreeNode<E> pivotNode) {
-            TreeNode<E> leftChild = pivotNode.left;
-            pivotNode.left = leftChild.right;
-            if (leftChild.right != null)
-                leftChild.right.parent = pivotNode;
-            leftChild.parent = pivotNode.parent;
-            if (pivotNode.parent == null)
-                root = leftChild;
-            else if (pivotNode.parent.right == pivotNode)
-                pivotNode.parent.right = leftChild;
-            else
-                pivotNode.parent.left = leftChild;
-            leftChild.right = pivotNode;
-            pivotNode.parent = leftChild;
-            return root;
-        }
-
-        /**
-         * Splits a tree bin into low and high bins during table resizing,
-         * untreeifying them if they drop below the threshold.
-         *
-         * @param tab         the hash table array
-         * @param index       the current bucket index
-         * @param capacityBit the capacity bit mask used for partitioning
-         */
-        private void split(final Node<E>[] tab, final int index, final int capacityBit) {
-            TreeNode<E> binRoot = this;
-            TreeNode<E> lowHead = null, lowTail = null;
-            TreeNode<E> highHead = null, highTail = null;
-            int lowCount = 0, highCount = 0;
-            for (TreeNode<E> currentNode = binRoot, next; currentNode != null; currentNode = next) {
-                next = (TreeNode<E>) currentNode.next;
-                currentNode.next = null;
-                if ((currentNode.hash & capacityBit) == 0) {
-                    if ((currentNode.previous = lowTail) == null)
-                        lowHead = currentNode;
-                    else
-                        lowTail.next = currentNode;
-                    lowTail = currentNode;
-                    ++lowCount;
-                } else {
-                    if ((currentNode.previous = highTail) == null)
-                        highHead = currentNode;
-                    else
-                        highTail.next = currentNode;
-                    highTail = currentNode;
-                    ++highCount;
-                }
-            }
-            if (lowHead != null)
-                if (lowCount <= UNTREEIFY_THRESHOLD)
-                    tab[index] = lowHead.untreeify();
-                else {
-                    tab[index] = lowHead;
-                    if (highHead != null)
-                        lowHead.treeify(tab);
-                }
-            if (highHead != null)
-                if (highCount <= UNTREEIFY_THRESHOLD)
-                    tab[index + capacityBit] = highHead.untreeify();
-                else {
-                    tab[index + capacityBit] = highHead;
-                    if (lowHead != null)
-                        highHead.treeify(tab);
-                }
-        }
-
-        /**
-         * Determines a tie-breaker comparison order for non-comparable objects based on class name and identity hash code.
-         *
-         * @param a the first object
-         * @param b the second object
-         * @return a negative or positive integer establishing strict ordering
-         */
-        private static int tieBreakOrder(final Object a, final Object b) {
-            int d;
-            if (a == null || b == null || (d = a.getClass().getName().compareTo(b.getClass().getName())) == 0)
-                d = identityHashCode(a) <= identityHashCode(b) ? -1 : 1;
-            return d;
-        }
-
-        /**
-         * Forms a balanced Red-Black tree out of the linked list nodes starting from this node.
-         *
-         * @param tab the hash table array
-         */
-        private void treeify(final Node<E>[] tab) {
-            TreeNode<E> root = null;
-            for (TreeNode<E> current = this, nextNode; current != null; current = nextNode) {
-                nextNode = (TreeNode<E>) current.next;
-                current.left = current.right = null;
-                if (root == null) {
-                    current.parent = null;
-                    current.isRed = false;
-                    root = current;
-                } else
-                    for (TreeNode<E> parent = root; ; ) {
-                        int direction = compare(current.hash, parent.hash, current.key, parent.key);
-                        TreeNode<E> insertionPoint = parent;
-                        if ((parent = (direction <= 0) ? parent.left : parent.right) == null) {
-                            current.parent = insertionPoint;
-                            if (direction <= 0)
-                                insertionPoint.left = current;
-                            else
-                                insertionPoint.right = current;
-                            root = balanceInsertion(root, current);
-                            break;
-                        }
-                    }
-            }
-            moveRootToFront(tab, root);
-        }
-
-        /**
-         * Converts this tree node structure back into a standard singly-linked list of {@link Node} instances.
-         *
-         * @return the head node of the new linked list
-         */
-        private Node<E> untreeify() {
-            Node<E> head = null, tail = null;
-            for (Node<E> current = this; current != null; current = current.next) {
-                Node<E> newNode = new Node<>(current.hash, current.key, null);
-                if (tail == null)
-                    head = newNode;
-                else
-                    tail.next = newNode;
-                tail = newNode;
-            }
-            return head;
-        }
-    }
-
-    /**
-     * A customized {@link Spliterator} implementation for traversing elements of a {@link CustomSet}.
-     *
-     * <p>{@code CustomSetSpliterator} supports parallel execution, fail-fast concurrency checks,
-     * late-binding table initialization, and binary tree/bucket range splitting.
-     *
-     * @param <E> the type of elements traversed by this spliterator
-     */
-    static class CustomSetSpliterator<E> implements Spliterator<E> {
-
-        private final CustomSet<E> set;
-        private Node<E> current;
-        private Node<E>[] table;
-        private long estimatedSize;
-        private int expectedModCount;
-        private int fence;
-        private int index;
-        private boolean includeNull;
-
-        /**
-         * Constructs a new {@code CustomSetSpliterator} with specified traversal bounds and configuration.
-         *
-         * @param set              the backing set
-         * @param origin           the lower bound index (inclusive) in the hash table array
-         * @param fence            the upper bound index (exclusive) in the hash table array, or {@code -1} to initialize lazily
-         * @param estimatedSize    the estimated number of elements in this split range
-         * @param expectedModCount the expected modification count
-         * @param isRoot           {@code true} if this spliterator is the root instance responsible for null element handling
-         */
-        public CustomSetSpliterator(final CustomSet<E> set, final int origin, final int fence, final long estimatedSize,
-                                    final int expectedModCount, final boolean isRoot) {
-            this.set = set;
-            this.index = origin;
-            this.fence = fence;
-            this.estimatedSize = estimatedSize;
-            this.expectedModCount = expectedModCount;
-            this.includeNull = isRoot && set.containsNull;
-            this.table = set.table;
-        }
-
-        /**
-         * Returns a set of characteristics reporting that this spliterator is {@link Spliterator#DISTINCT}
-         * and conditionally {@link Spliterator#SIZED}.
-         *
-         * @return the characteristic flags
-         */
-        public int characteristics() {
-            return (fence < 0 || estimatedSize == set.size ? Spliterator.SIZED : 0) | Spliterator.DISTINCT;
-        }
-
-        /**
-         * Returns an estimate of the number of elements encountered by a {@link #forEachRemaining} traversal,
-         * or returns {@link Long#MAX_VALUE} if infinite, unknown, or too expensive to compute.
-         *
-         * @return the estimated element count
-         */
-        public long estimateSize() {
-            getFence();
-            return Math.max(estimatedSize, 0);
-        }
-
-        /**
-         * Performs the given action for each remaining element, sequentially in the current thread,
-         * until all elements have been processed or the action throws an exception.
-         *
-         * @param action the action to perform on each element
-         * @throws NullPointerException if the specified action is null
-         * @throws ConcurrentModificationException if the backing set was structurally modified concurrently
-         */
-        public void forEachRemaining(final Consumer<? super E> action) {
-            requireNonNull(action);
-            checkForComodification();
-            if (includeNull) {
-                includeNull = false;
-                action.accept(null);
-            }
-            Node<E>[] tab = table;
-            if (tab == null) {
-                getFence();
-                tab = table;
-            }
-            int high = getFence();
-            for (Node<E> node = current; node != null; node = node.next)
-                action.accept(node.key);
-            current = null;
-            for (int i = index; i < high; i++)
-                for (Node<E> n = tab[i]; n != null; n = n.next)
-                    action.accept(n.key);
-            index = high;
-            estimatedSize = 0;
-            checkForComodification();
-        }
-
-        /**
-         * If a remaining element exists, performs the given action on it, returning {@code true};
-         * otherwise returns {@code false}.
-         *
-         * @param action the action to perform on the next element
-         * @return {@code true} if an element was processed; {@code false} if no elements remained
-         * @throws NullPointerException if the specified action is null
-         * @throws ConcurrentModificationException if the backing set was structurally modified concurrently
-         */
-        public boolean tryAdvance(final Consumer<? super E> action) {
-            requireNonNull(action);
-            checkForComodification();
-            if (includeNull) {
-                includeNull = false;
-                action.accept(null);
-                if (estimatedSize > 0)
-                    estimatedSize--;
-                return true;
-            }
-            Node<E>[] tab = table;
-            if (tab == null) {
-                getFence();
-                tab = table;
-            }
-            int higherIndex = getFence();
-            while (true) {
-                if (current != null) {
-                    E e = current.key;
-                    current = current.next;
-                    action.accept(e);
-                    if (estimatedSize > 0)
-                        estimatedSize--;
-                    return true;
-                }
-                if (index >= higherIndex)
-                    return false;
-                current = tab[index++];
-            }
-        }
-
-        /**
-         * If this spliterator can be partitioned, returns a {@code Spliterator} covering elements,
-         * that will, upon return from this method, not be covered by this spliterator.
-         *
-         * @return a {@code Spliterator} covering some portion of the elements, or {@code null} if unbreakable
-         */
-        public Spliterator<E> trySplit() {
-            int high = getFence(), low = index, mid = (low + high) >>> 1;
-            if (estimatedSize <= 1 || low >= mid || current != null)
-                return null;
-            long half = estimatedSize >>> 1;
-            estimatedSize -= half;
-            index = mid;
-            return new CustomSetSpliterator<>(set, low, mid, half, expectedModCount, false);
-        }
-
-        private void checkForComodification() {
-            if (set.modCount != expectedModCount)
-                throw new ConcurrentModificationException();
-        }
-
-        private int getFence() {
-            int higherIndex;
-            if ((higherIndex = fence) < 0) {
-                table = set.table;
-                estimatedSize = set.size;
-                expectedModCount = set.modCount;
-                higherIndex = fence = (table == null) ? 0 : table.length;
-            }
-            return higherIndex;
-        }
     }
 }

@@ -1,6 +1,17 @@
 package customset;
 
-import org.openjdk.jmh.annotations.*;
+import org.openjdk.jmh.annotations.Benchmark;
+import org.openjdk.jmh.annotations.BenchmarkMode;
+import org.openjdk.jmh.annotations.Fork;
+import org.openjdk.jmh.annotations.Level;
+import org.openjdk.jmh.annotations.Measurement;
+import org.openjdk.jmh.annotations.Mode;
+import org.openjdk.jmh.annotations.OutputTimeUnit;
+import org.openjdk.jmh.annotations.Param;
+import org.openjdk.jmh.annotations.Scope;
+import org.openjdk.jmh.annotations.Setup;
+import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
 import org.openjdk.jmh.results.format.ResultFormatType;
 import org.openjdk.jmh.runner.Runner;
@@ -60,7 +71,6 @@ public class CustomSetV3Benchmark {
         }
     }
 
-    // Construction
     @Benchmark
     public CustomSet<Integer> benchmarkConstructor() {
         return new CustomSet<>();
@@ -94,7 +104,6 @@ public class CustomSetV3Benchmark {
         return s.addAll(inputCollection);
     }
 
-    // Read-only
     @Benchmark
     public CustomSet<Integer> benchmarkClone() {
         return baseSet.clone();
@@ -162,7 +171,6 @@ public class CustomSetV3Benchmark {
         return baseSet.toString();
     }
 
-    // Mutating (clone first)
     @Benchmark
     public boolean benchmarkRemove() {
         CustomSet<Integer> s = baseSet.clone();
@@ -190,14 +198,11 @@ public class CustomSetV3Benchmark {
 
     public static void main(String[] args) throws RunnerException {
         Options opt = new OptionsBuilder()
-                .include(".*benchmarkConstructor.*") // Matches all constructor benchmarks
-                .result("custom-set-v3-constructors.csv")
+                .include(CustomSetV3Benchmark.class.getSimpleName())
+                .forks(1)
+                .result("custom-set-v3-results.csv")
                 .resultFormat(ResultFormatType.CSV)
                 .build();
         new Runner(opt).run();
     }
-
-    //started 17:58
-    //ETA 2:45
-    //finish ~20:43
 }

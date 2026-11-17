@@ -76,9 +76,10 @@ def load_csv(filepath):
     with open(filepath, 'r', encoding='utf-8') as f:
         reader = csv.DictReader(f, delimiter=';')
         for row in reader:
-            size = int(row['Size'])
+            size = int(float(row['Size']))  # Safe against float-string representations (e.g., '1000.0')
             data[size] = {
-                k: float(v) for k, v in row.items() if k != 'Size'
+                k: float(v) if v not in (None, '') else np.nan
+                for k, v in row.items() if k != 'Size'
             }
     return data
 
@@ -205,7 +206,7 @@ def main():
     canonical_sizes = sorted(list(canonical_sizes))
     print(f"Unified sizes for x-axis: {canonical_sizes}")
 
-    if OUTPUT_DIR:
+    if OUTPUT_DIR and OUTPUT_DIR != ".":
         os.makedirs(OUTPUT_DIR, exist_ok=True)
     out_dir_str = OUTPUT_DIR if OUTPUT_DIR else "."
     print(f"Generating comparison charts in '{out_dir_str}'...")
