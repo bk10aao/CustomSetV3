@@ -27,101 +27,102 @@ overhead by 25%.
 
 ## Performance Advantages & Architectural Optimizations
 
-### 1. Direct Entry Storage vs. JDK Wrapper Overhead (`constructor`, `add`)
-- **The JDK Bottleneck:** The standard JDK `HashSet` delegates storage internally to a `HashMap`. Every unique element 
-inserted into a `HashSet` is wrapped inside a separate `HashMap.Node` object, which in turn points to a shared static 
-dummy presentation value. This creates massive object allocation overhead, increases heap memory pressure, and 
-introduces scattered memory references that cause CPU cache misses during traversal.
+## Performance Advantages & Architectural Optimizations
 
-- **V3 Advantage:** `CustomSetV3` bypasses wrapper objects entirely by storing entry keys directly inside lightweight
-`Node` and `TreeNode` instances within the primary hash table array. This structural optimization slashes heap 
-allocation overhead, improves memory locality, and accelerates wall-clock execution times across bulk operations.
+## Performance Advantages & Architectural Optimizations
+
+### 1. Direct Entry Storage vs. JDK Wrapper Overhead (`constructor`, `add`)
+- **The JDK Bottleneck:** The standard JDK `HashSet` delegates storage internally to a `HashMap`. Every unique element
+  inserted into a `HashSet` is wrapped inside a separate `HashMap.Node` object, which in turn points to a shared static
+  dummy presentation value. This creates massive object allocation overhead, increases heap memory pressure, and
+  introduces scattered memory references that cause CPU cache misses during traversal.
+
+- **V3 Advantage:** `CustomSet` bypasses wrapper objects entirely by storing entry keys directly inside lightweight
+  `Node` and `TreeNode` instances within the primary hash table array. This structural optimization slashes heap
+  allocation overhead, improves memory locality, and accelerates wall-clock execution times across bulk operations.
 
 ### 2. Upfront Capacity Pre-Allocation & Sizing (`constructor(Collection c)`, `addAll`)
-- **The JDK Bottleneck:** Constructing a JDK `HashSet` from an existing collection or repeatedly invoking `addAll` often 
-incurs multiple intermediate rehashing steps and dynamic table resizing as the internal map grows past default 
-thresholds.
+- **The JDK Bottleneck:** Constructing a JDK `HashSet` from an existing collection or repeatedly invoking `addAll` often
+  incurs multiple intermediate rehashing steps and dynamic table resizing as the internal map grows past default
+  thresholds.
 
-- **V3 Advantage:** V3 constructors and bulk insertion methods calculate exact initial capacities upfront using 
-`tableSizeFor` and load factor constraints (`(c.size() / DEFAULT_LOAD_FACTOR) + 1`). By sizing the backing array 
-precisely before inserting any elements, V3 completely eliminates mid-construction resizing overhead.
+- **V3 Advantage:** V3 constructors and bulk insertion methods calculate exact initial capacities upfront using
+  `tableSizeFor` and load factor constraints (`(c.size() / DEFAULT_LOAD_FACTOR) + 1`). By sizing the backing array
+  precisely before inserting any elements, V3 completely eliminates mid-construction resizing overhead.
 
 ### 3. Optimized Set Intersection Operations (`retainAll`)
-- **The JDK Bottleneck:** In standard JDK implementations, `retainAll(Collection)` iterates over the set and performs 
-repetitive, sequential containment checks against the target collection, resulting in a sluggish $O(N \cdot M)$ 
-worst-case execution profile for non-set collections.
+- **The JDK Bottleneck:** In standard JDK implementations, `retainAll(Collection)` iterates over the set and performs
+  repetitive, sequential containment checks against the target collection, resulting in a sluggish $O(N \cdot M)$
+  worst-case execution profile for non-set collections.
 
-- **V3 Advantage:** V3 optimizes non-set collections by converting them upfront into a temporary `CustomSet` 
-(`final Collection<?> retainValues = (c instanceof Set) ? c : new CustomSet<>(c);`). This drops the algorithmic time 
-complexity from $O(N \cdot M)$ down to an $O(N + M)$ lookup blitz, yielding massive performance gains (exceeding 
-**378× speedups** in benchmark evaluations).
+- **V3 Advantage:** V3 optimizes non-set collections by converting them upfront into a temporary `CustomSet`
+  (`final Collection<?> retain = (c instanceof CustomSet) ? c : new CustomSet<Object>(c);`). This drops the algorithmic time
+  complexity from $O(N \cdot M)$ down to an $O(N + M)$ lookup blitz, yielding massive performance gains (exceeding
+  **501× speedups** in benchmark evaluations).
 
 ### 4. Zero-Allocation Iterator Traversal (`iterator`, `spliterator`)
-- **The JDK Bottleneck:** Iterators over standard collection wrappers frequently instantiate cursor tracking objects or 
-rely on generic map iterators that introduce garbage collection churn during large-scale sequential traversal.
+- **The JDK Bottleneck:** Iterators over standard collection wrappers frequently instantiate cursor tracking objects or
+  rely on generic map iterators that introduce garbage collection churn during large-scale sequential traversal.
 
-- **V3 Advantage:** V3's custom `HashIterator` performs zero-allocation pointer traversals across standard singly-linked 
-collision chains, caching localized key snapshots only when stepping into complex Red-Black tree bins. This minimizes 
-object allocation churn and keeps iteration streams fast and efficient.
+- **V3 Advantage:** V3's custom `HashIterator` performs zero-allocation pointer traversals across standard singly-linked
+  collision chains, caching localized key snapshots only when stepping into complex Red-Black tree bins. This minimizes
+  object allocation churn and keeps iteration streams fast and efficient.
 
 ### 5. Power-of-Two Bitwise Splitting in Resize Operations (`resize`, `transferBins`)
-- **The JDK Bottleneck:** General-purpose table resizing requires re-evaluating hash codes and recalculating bucket 
-indices for every stored element from scratch.
+- **The JDK Bottleneck:** General-purpose table resizing requires re-evaluating hash codes and recalculating bucket
+  indices for every stored element from scratch.
 
-- **V3 Advantage:** When doubling table capacity (`newCapacity == oldCapacity << 1`), V3 bypasses full re-indexing 
-arithmetic entirely, utilizing the bitwise check `(entry.hash & oldCapacity)` to partition collision chains cleanly into 
-low and high bins in-place without re-computing hash codes or allocating new wrapper nodes.
+- **V3 Advantage:** When doubling table capacity (`newCapacity == oldCapacity << 1`), V3 bypasses full re-indexing
+  arithmetic entirely, utilizing the bitwise check `(entry.hash & oldCapacity)` to partition collision chains cleanly into
+  low and high bins in-place without re-computing hash codes or allocating new wrapper nodes.
 
 ### 6. Adaptive Removal Heuristic (`removeAll`)
-- **The JDK Bottleneck:** Standard JDK implementations of `removeAll(Collection)` blindly iterate over the entire 
-collection or set without regard to relative sizes, often leading to redundant scans when removing a small collection 
-from a massive set (or vice versa).
+- **The JDK Bottleneck:** Standard JDK implementations of `removeAll(Collection)` blindly iterate over the entire
+  collection or set without regard to relative sizes, often leading to redundant scans when removing a small collection
+  from a massive set (or vice versa).
 
-- **V3 Advantage:** `CustomSet` dynamically evaluates set cardinalities (`if (size > c.size())`) to choose the optimal 
-removal strategy: either targeting individual collection elements directly for rapid deletion or running a single-pass 
-iterator scan. This adaptive branching ensures optimal time complexity regardless of relative collection sizes.
+- **V3 Advantage:** `CustomSet` dynamically evaluates set cardinalities (`if (size > c.size())`) to choose the optimal
+  removal strategy: either targeting individual collection elements directly for rapid deletion or running a single-pass
+  iterator scan. This adaptive branching ensures optimal time complexity regardless of relative collection sizes.
 
-### 7. Dedicated Null-Element Tracking (`containsNull`)
-- **The JDK Bottleneck:** Standard hash sets typically treat `null` as a special hash-bucket entry or require dedicated 
-null-slot handling inside collision chains, introducing conditional branching overhead on every lookup.
+### 7. Deterministic Hash-Bucket Null Handling (`hash`, `add`)
+- **The JDK Bottleneck:** Some set or map implementations require special conditional branches or dedicated sentinel wrappers to process `null` keys safely without throwing `NullPointerException`.
 
-- **V3 Advantage:** V3 tracks `null` elements via a dedicated `containsNull` boolean flag rather than occupying a hash 
-table bucket index. This eliminates hash-collision overhead, hash code computation, and null-check branching on standard 
-lookups.
+- **V3 Advantage:** V3 evaluates `null` keys via a deterministic hash code of `0` (`(key == null) ? 0 : ...`), routing `null` values directly into bucket `0` alongside standard collision chains and Red-Black trees. This avoids redundant conditional branching overhead during standard lookups while maintaining full `null` compatibility.
 
 ### 8. Adaptive Table Sizing & Bitwise Masking (`tableSizeFor`, `hash`)
-- **The JDK Bottleneck:** Inefficient table sizing calculations or modulo-based index arithmetic can lead to suboptimal 
-memory packing and expensive division CPU instructions during lookups.
+- **The JDK Bottleneck:** Inefficient table sizing calculations or modulo-based index arithmetic can lead to suboptimal
+  memory packing and expensive division CPU instructions during lookups.
 
-- **V3 Advantage:** V3 enforces exact power-of-two table capacities via bit-manipulation in `tableSizeFor`, enabling 
-table index lookups to execute via lightning-fast bitwise AND operations (`hash & (table.length - 1)`). Furthermore, 
-secondary bit-mixing (`h ^ (h >>> 16)`) spreads high bits into lower bits to minimize collisions even with poorly 
-implemented user key hash codes.
+- **V3 Advantage:** V3 enforces exact power-of-two table capacities via bit-manipulation in `tableSizeFor`, enabling
+  table index lookups to execute via lightning-fast bitwise AND operations (`hash & (table.length - 1)`). Furthermore,
+  secondary bit-mixing (`h ^ (h >>> HASH_BITS_TO_SHIFT)`) spreads high bits into lower bits to minimize collisions even with poorly
+  implemented user key hash codes.
 
 ### 9. Stream-Ready Parallel Spliterators (`spliterator`)
-- **The JDK Bottleneck:** Standard or poorly optimized set wrappers often provide naive spliterators that lack efficient 
-range splitting or proper structural safety checks during parallel stream processing.
+- **The JDK Bottleneck:** Standard or poorly optimized set wrappers often provide naive spliterators that lack efficient
+  range splitting or proper structural safety checks during parallel stream processing.
 
-- **V3 Advantage:** V3 implements a specialized `CustomSetSpliterator` that supports fail-fast concurrency checks 
-(`ConcurrentModificationException`), late-binding table initialization, and binary tree/bucket range splitting 
-(`trySplit()`). This allows the set to integrate seamlessly into modern Java parallel streams and functional pipelines 
-with optimal work-stealing efficiency.
+- **V3 Advantage:** V3 implements a specialized `CustomSetSpliterator` that supports fail-fast concurrency checks
+  (`ConcurrentModificationException`), late-binding table initialization, and binary tree/bucket range splitting
+  (`trySplit()`). This allows the set to integrate seamlessly into modern Java parallel streams and functional pipelines
+  with optimal work-stealing efficiency.
 
 ### 10. Custom Packed Serialization (`writeObject`, `readObject`)
-- **The JDK Bottleneck:** Default Java serialization for complex collection wrappers often serializes redundant metadata 
-or incurs heavy reflection overhead, resulting in bloated byte streams and slow deserialization times.
+- **The JDK Bottleneck:** Default Java serialization for complex collection wrappers often serializes redundant metadata
+  or incurs heavy reflection overhead, resulting in bloated byte streams and slow deserialization times.
 
-- **V3 Advantage:** V3 implements custom `writeObject` and `readObject` routines that pack only the essential capacity 
-and active mapping entries directly into the serialization stream, reconstructing the hash table and re-establishing 
-table thresholds efficiently upon deserialization without redundant object overhead.
+- **V3 Advantage:** V3 implements custom `writeObject` and `readObject` routines that pack only the essential capacity
+  and active mapping entries directly into the serialization stream, reconstructing the hash table and re-establishing
+  table thresholds efficiently upon deserialization without redundant object overhead.
 
 ### 11. Pre-Sized StringBuilder Buffer Allocation (`toString`)
-- **The JDK Bottleneck:** Default collection `toString()` implementations often rely on dynamic string concatenation or 
-iterative buffer resizing as elements are appended, triggering continuous memory reallocation and array copying.
+- **The JDK Bottleneck:** Default collection `toString()` implementations often rely on dynamic string concatenation or
+  iterative buffer resizing as elements are appended, triggering continuous memory reallocation and array copying.
 
-- **V3 Advantage:** V3's `toString()` calculates an initial capacity heuristically 
-(`(int) Math.min(1 << 20, Math.max(16L, size * 8L))`) based on active set size before instantiating the `StringBuilder`. 
-This pre-allocation entirely eliminates buffer reallocation churn during string serialization.
+- **V3 Advantage:** V3's `toString()` calculates an initial capacity heuristically
+  (`(int) Math.min(1 << 20, Math.max(16L, size * 8L))`) based on active set size before instantiating the `StringBuilder`.
+  This pre-allocation entirely eliminates buffer reallocation churn during string serialization.
 
 ## Trade-Offs & Architectural Limitations
 
@@ -240,86 +241,87 @@ All methods implemented are identical to those found in the Java
 
 ### V3 vs JDK HashSet
 
-| Method                         | CustomSetV3 |  JDK HashSet   |            Winner            | Speedup Margin |
-|:-------------------------------|:-----------:|:--------------:|:----------------------------:|:--------------:|
-| **`add(E)`**                   | 552,385 ns  |   668,344 ns   |            **V3**            |     1.21×      |
-| **`addAll(Collection)`**       | 352,379 ns  |   628,770 ns   |            **V3**            |     1.78×      |
-| **`clear()`**                  | 160,821 ns  |   398,639 ns   |            **V3**            |     2.48×      |
-| **`clone()`**                  | 273,018 ns  |   554,600 ns   |            **V3**            |     2.03×      |
-| **`constructor()`**            |   1.60 ns   |    3.01 ns     |            **V3**            |     1.89×      |
-| **`constructor(Collection)`**  | 348,686 ns  |   525,952 ns   |            **V3**            |     1.51×      |
-| **`constructor(int)`**         |   1.83 ns   |    3.15 ns     |            **V3**            |     1.72×      |
-| **`constructor(int, double)`** |   1.84 ns   |    3.15 ns     |            **V3**            |     1.71×      |
-| **`contains(Object)`**         |   3.80 ns   |    2.22 ns     |           **JDK**            |     1.71×      |
-| **`containsAll(Collection)`**  |  19,220 ns  |   21,641 ns    |            **V3**            |     1.13×      |
-| **`equals(Object)`**           | 789,302 ns  |  1,001,732 ns  |            **V3**            |     1.27×      |
-| **`hashCode()`**               |  78,447 ns  |   170,285 ns   |            **V3**            |     2.17×      |
-| **`isEmpty()`**                |   0.54 ns   |    0.64 ns     |            **V3**            |     1.18×      |
-| **`iterator()`**               | 106,789 ns  |   170,308 ns   |            **V3**            |     1.59×      |
-| **`remove(Object)`**           | 272,807 ns  |   532,244 ns   |            **V3**            |     1.95×      |
-| **`removeAll(Collection)`**    | 334,997 ns  |   577,449 ns   |            **V3**            |     1.72×      |
-| **`retainAll(Collection)`**    | 484,465 ns  | 181,812,058 ns |            **V3**            |  **375.28×**   |
-| **`size()`**                   |   0.54 ns   |    0.64 ns     |            **V3**            |     1.18×      |
-| **`spliterator()`**            |  93,786 ns  |   105,410 ns   |            **V3**            |     1.12×      |
-| **`toArray()`**                |  98,600 ns  |   100,299 ns   | **Statistically Equivalent** |     ~1.00×     |
-| **`toArray(T[])`**             | 112,183 ns  |   112,000 ns   | **Statistically Equivalent** |     ~1.00×     |
-| **`toString()`**               | 612,524 ns  |   754,131 ns   |            **V3**            |     1.23×      |
+| Method                         |     V3     |  JDK HashSet   |            Winner            | Speedup Margin |
+|:-------------------------------|:----------:|:--------------:|:----------------------------:|:--------------:|
+| **`add(E)`**                   | 494,851 ns |   668,344 ns   |            **V3**            |     1.35×      |
+| **`addAll(Collection)`**       | 343,238 ns |   628,770 ns   |            **V3**            |     1.83×      |
+| **`clear()`**                  | 154,275 ns |   398,639 ns   |            **V3**            |     2.58×      |
+| **`clone()`**                  | 271,763 ns |   554,600 ns   |            **V3**            |     2.04×      |
+| **`constructor()`**            |  1.51 ns   |    3.01 ns     |            **V3**            |     2.00×      |
+| **`constructor(Collection)`**  | 337,047 ns |   525,952 ns   |            **V3**            |     1.56×      |
+| **`constructor(int)`**         |  1.64 ns   |    3.15 ns     |            **V3**            |     1.92×      |
+| **`constructor(int, double)`** |  1.64 ns   |    3.15 ns     |            **V3**            |     1.93×      |
+| **`contains(Object)`**         |  3.79 ns   |    2.22 ns     |           **JDK**            |     1.71×      |
+| **`containsAll(Collection)`**  | 19,229 ns  |   21,641 ns    |            **V3**            |     1.13×      |
+| **`equals(Object)`**           | 776,034 ns |  1,001,732 ns  |            **V3**            |     1.29×      |
+| **`hashCode()`**               | 78,284 ns  |   170,285 ns   |            **V3**            |     2.18×      |
+| **`isEmpty()`**                |  0.53 ns   |    0.64 ns     |            **V3**            |     1.20×      |
+| **`iterator()`**               | 105,462 ns |   170,308 ns   |            **V3**            |     1.61×      |
+| **`remove(Object)`**           | 270,351 ns |   532,244 ns   |            **V3**            |     1.97×      |
+| **`removeAll(Collection)`**    | 307,264 ns |   577,449 ns   |            **V3**            |     1.88×      |
+| **`retainAll(Collection)`**    | 362,631 ns | 181,812,065 ns |            **V3**            |  **501.37×**   |
+| **`size()`**                   |  0.53 ns   |    0.64 ns     |            **V3**            |     1.19×      |
+| **`spliterator()`**            | 93,602 ns  |   105,410 ns   |            **V3**            |     1.13×      |
+| **`toArray()`**                | 99,550 ns  |   100,299 ns   | **Statistically Equivalent** |     ~1.00×     |
+| **`toArray(T[])`**             | 109,326 ns |   112,000 ns   | **Statistically Equivalent** |     ~1.00×     |
+| **`toString()`**               | 592,685 ns |   754,131 ns   |            **V3**            |     1.27×      |
 
 
 ### V3 vs V2
 
-| Method                         |     V3     |      V2       |            Winner            |   Margin   |
-|:-------------------------------|:----------:|:-------------:|:----------------------------:|:----------:|
-| **`add(E)`**                   | 552,385 ns |  661,381 ns   |            **V3**            |   1.20×    |
-| **`addAll(Collection)`**       | 352,379 ns |  615,153 ns   |            **V3**            |   1.75×    |
-| **`clear()`**                  | 160,821 ns |    2.07 ns    |            **V2**            | 77,678.49× |
-| **`clone()`**                  | 273,018 ns |  314,208 ns   |            **V3**            |   1.15×    |
-| **`constructor()`**            |  1.60 ns   |    3.02 ns    |            **V3**            |   1.89×    |
-| **`constructor(Collection)`**  | 348,686 ns |  526,958 ns   |            **V3**            |   1.51×    |
-| **`constructor(int)`**         |  1.83 ns   |    3.16 ns    |            **V3**            |   1.73×    |
-| **`constructor(int, double)`** |  1.84 ns   |    3.21 ns    |            **V3**            |   1.74×    |
-| **`contains(Object)`**         |  3.80 ns   |    2.39 ns    |            **V2**            |   1.59×    |
-| **`containsAll(Collection)`**  | 19,220 ns  |   22,287 ns   |            **V3**            |   1.16×    |
-| **`equals(Object)`**           | 789,302 ns | 1,029,691 ns  |            **V3**            |   1.30×    |
-| **`hashCode()`**               | 78,447 ns  |   87,857 ns   |            **V3**            |   1.12×    |
-| **`isEmpty()`**                |  0.54 ns   |    0.74 ns    |            **V3**            |   1.37×    |
-| **`iterator()`**               | 106,789 ns |  170,913 ns   |            **V3**            |   1.60×    |
-| **`remove(Object)`**           | 272,807 ns |  315,326 ns   |            **V3**            |   1.16×    |
-| **`removeAll(Collection)`**    | 334,997 ns |  289,537 ns   |            **V2**            |   1.16×    |
-| **`retainAll(Collection)`**    | 484,465 ns | 20,244,102 ns |            **V3**            | **41.79×** |
-| **`size()`**                   |  0.54 ns   |    0.74 ns    |            **V3**            |   1.37×    |
-| **`spliterator()`**            | 93,786 ns  |  106,394 ns   |            **V3**            |   1.13×    |
-| **`toArray()`**                | 98,600 ns  |  105,028 ns   |            **V3**            |   1.07×    |
-| **`toArray(T[])`**             | 112,183 ns |  109,054 ns   | **Statistically Equivalent** |   ~1.00×   |
-| **`toString()`**               | 612,524 ns |  873,254 ns   |            **V3**            |   1.43×    |
+| Method                         |     V3     |      V2       |            Winner            |     Margin     |
+|:-------------------------------|:----------:|:-------------:|:----------------------------:|:--------------:|
+| **`add(E)`**                   | 494,851 ns |  661,381 ns   |            **V3**            |     1.34×      |
+| **`addAll(Collection)`**       | 343,238 ns |  615,153 ns   |            **V3**            |     1.79×      |
+| **`clear()`**                  | 154,275 ns |    2.07 ns    |            **V2**            | **74,516.85×** |
+| **`clone()`**                  | 271,763 ns |  314,208 ns   |            **V3**            |     1.16×      |
+| **`constructor()`**            |  1.51 ns   |    3.02 ns    |            **V3**            |     2.00×      |
+| **`constructor(Collection)`**  | 337,047 ns |  526,958 ns   |            **V3**            |     1.56×      |
+| **`constructor(int)`**         |  1.64 ns   |    3.16 ns    |            **V3**            |     1.92×      |
+| **`constructor(int, double)`** |  1.64 ns   |    3.21 ns    |            **V3**            |     1.96×      |
+| **`contains(Object)`**         |  3.79 ns   |    2.39 ns    |            **V2**            |     1.58×      |
+| **`containsAll(Collection)`**  | 19,229 ns  |   22,287 ns   |            **V3**            |     1.16×      |
+| **`equals(Object)`**           | 776,034 ns | 1,029,691 ns  |            **V3**            |     1.33×      |
+| **`hashCode()`**               | 78,284 ns  |   87,857 ns   |            **V3**            |     1.12×      |
+| **`isEmpty()`**                |  0.53 ns   |    0.74 ns    |            **V3**            |     1.39×      |
+| **`iterator()`**               | 105,462 ns |  170,913 ns   |            **V3**            |     1.62×      |
+| **`remove(Object)`**           | 270,351 ns |  315,326 ns   |            **V3**            |     1.17×      |
+| **`removeAll(Collection)`**    | 307,264 ns |  289,537 ns   |            **V2**            |     1.06×      |
+| **`retainAll(Collection)`**    | 362,631 ns | 20,244,102 ns |            **V3**            |   **55.83×**   |
+| **`size()`**                   |  0.53 ns   |    0.74 ns    |            **V3**            |     1.39×      |
+| **`spliterator()`**            | 93,602 ns  |  106,394 ns   |            **V3**            |     1.14×      |
+| **`toArray()`**                | 99,550 ns  |  105,028 ns   |            **V3**            |     1.06×      |
+| **`toArray(T[])`**             | 109,326 ns |  109,054 ns   | **Statistically Equivalent** |     ~1.00×     |
+| **`toString()`**               | 592,685 ns |  873,254 ns   |            **V3**            |     1.47×      |
 
 
 ### V3 vs V1
 
-| Method                         |     V3     |       V1       |            Winner            |   Margin    |
-|:-------------------------------|:----------:|:--------------:|:----------------------------:|:-----------:|
-| **`add(E)`**                   | 552,385 ns |  1,952,206 ns  |            **V3**            |    3.53×    |
-| **`addAll(Collection)`**       | 352,379 ns |  2,048,502 ns  |            **V3**            |    5.81×    |
-| **`clear()`**                  | 160,821 ns |   495,582 ns   |            **V3**            |    3.08×    |
-| **`clone()`**                  | 273,018 ns |   496,985 ns   |            **V3**            |    1.82×    |
-| **`constructor()`**            |  1.60 ns   |    4.50 ns     |            **V3**            |    2.82×    |
-| **`constructor(Collection)`**  | 348,686 ns |   291,602 ns   |            **V1**            |    1.20×    |
-| **`constructor(int)`**         |  1.83 ns   |    2,446 ns    |            **V3**            |  1,334.96×  |
-| **`constructor(int, double)`** |  1.84 ns   |    2,445 ns    |            **V3**            |  1,325.45×  |
-| **`contains(Object)`**         |  3.80 ns   |    2.12 ns     |            **V1**            |    1.80×    |
-| **`containsAll(Collection)`**  | 19,220 ns  |    8,456 ns    |            **V1**            |    2.27×    |
-| **`equals(Object)`**           | 789,302 ns |  2,376,269 ns  |            **V3**            |    3.01×    |
-| **`hashCode()`**               | 78,447 ns  |   109,964 ns   |            **V3**            |    1.40×    |
-| **`isEmpty()`**                |  0.54 ns   |    0.54 ns     | **Statistically Equivalent** |   ~1.00×    |
-| **`iterator()`**               | 106,789 ns |   238,021 ns   |            **V3**            |    2.23×    |
-| **`remove(Object)`**           | 272,807 ns |   509,098 ns   |            **V3**            |    1.87×    |
-| **`removeAll(Collection)`**    | 334,997 ns |   549,852 ns   |            **V3**            |    1.64×    |
-| **`retainAll(Collection)`**    | 484,465 ns | 183,425,778 ns |            **V3**            | **378.62×** |
-| **`size()`**                   |  0.54 ns   |    0.54 ns     | **Statistically Equivalent** |   ~1.00×    |
-| **`spliterator()`**            | 93,786 ns  |   125,419 ns   |            **V3**            |    1.34×    |
-| **`toArray()`**                | 98,600 ns  |   138,589 ns   |            **V3**            |    1.41×    |
-| **`toArray(T[])`**             | 112,183 ns |   145,863 ns   |            **V3**            |    1.30×    |
-| **`toString()`**               | 612,524 ns |   794,851 ns   |            **V3**            |    1.30×    |
+| Method                         |     V3     |       V1       |            Winner            |    Margin     |
+|:-------------------------------|:----------:|:--------------:|:----------------------------:|:-------------:|
+| **`add(E)`**                   | 494,851 ns |  1,952,206 ns  |            **V3**            |     3.95×     |
+| **`addAll(Collection)`**       | 343,238 ns |  2,048,502 ns  |            **V3**            |     5.97×     |
+| **`clear()`**                  | 154,275 ns |   495,582 ns   |            **V3**            |     3.21×     |
+| **`clone()`**                  | 271,763 ns |   496,985 ns   |            **V3**            |     1.83×     |
+| **`constructor()`**            |  1.51 ns   |    4.50 ns     |            **V3**            |     2.99×     |
+| **`constructor(Collection)`**  | 337,047 ns |   291,602 ns   |            **V1**            |     1.16×     |
+| **`constructor(int)`**         |  1.64 ns   |    2,446 ns    |            **V3**            | **1,488.90×** |
+| **`constructor(int, double)`** |  1.64 ns   |    2,445 ns    |            **V3**            | **1,493.47×** |
+| **`contains(Object)`**         |  3.79 ns   |    2.12 ns     |            **V1**            |     1.79×     |
+| **`containsAll(Collection)`**  | 19,229 ns  |    8,456 ns    |            **V1**            |     2.27×     |
+| **`equals(Object)`**           | 776,034 ns |  2,376,269 ns  |            **V3**            |     3.06×     |
+| **`hashCode()`**               | 78,284 ns  |   109,964 ns   |            **V3**            |     1.40×     |
+| **`isEmpty()`**                |  0.53 ns   |    0.54 ns     | **Statistically Equivalent** |    ~1.00×     |
+| **`iterator()`**               | 105,462 ns |   238,021 ns   |            **V3**            |     2.26×     |
+| **`remove(Object)`**           | 270,351 ns |   509,098 ns   |            **V3**            |     1.88×     |
+| **`removeAll(Collection)`**    | 307,264 ns |   549,852 ns   |            **V3**            |     1.79×     |
+| **`retainAll(Collection)`**    | 362,631 ns | 183,425,778 ns |            **V3**            |  **505.82×**  |
+| **`size()`**                   |  0.53 ns   |    0.54 ns     | **Statistically Equivalent** |    ~1.00×     |
+| **`spliterator()`**            | 93,602 ns  |   125,419 ns   |            **V3**            |     1.34×     |
+| **`toArray()`**                | 99,550 ns  |   138,589 ns   |            **V3**            |     1.39×     |
+| **`toArray(T[])`**             | 109,326 ns |   145,863 ns   |            **V3**            |     1.33×     |
+| **`toString()`**               | 592,685 ns |   794,851 ns   |            **V3**            |     1.34×     |
+
 ## Performance Testing
 
 <b>Note: The following performance charts are designed to be viewed in dark mode.</b>

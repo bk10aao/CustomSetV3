@@ -24,24 +24,19 @@ final class HashIterator<E> implements Iterator<E> {
     private E lastReturnedKey;
     private int expectedModCount;
     private int index;
-    private boolean yieldNull;
-    private boolean currentIsNull;
     private boolean canRemove;
 
     /**
      * Constructs a new {@code HashIterator} positioned at the first available element
-     * in the specified set, yielding {@code null} first if present.
+     * in the specified set.
      *
      * @param set the backing {@link CustomSet} to iterate over
      */
     HashIterator(final CustomSet<E> set) {
         this.set = set;
         this.expectedModCount = set.modCount;
-        this.yieldNull = set.containsNull;
         this.index = 0;
-        if (!yieldNull) {
-            advanceToNextBucket();
-        }
+        advanceToNextBucket();
     }
 
     /**
@@ -51,7 +46,7 @@ final class HashIterator<E> implements Iterator<E> {
      */
     @Override
     public boolean hasNext() {
-        return yieldNull || treeBucketKeys != null || next != null;
+        return treeBucketKeys != null || next != null;
     }
 
     /**
@@ -64,18 +59,9 @@ final class HashIterator<E> implements Iterator<E> {
     @Override
     public E next() {
         checkForComodification();
-        if (yieldNull) {
-            yieldNull = false;
-            lastReturnedKey = null;
-            currentIsNull = true;
-            canRemove = true;
-            advanceToNextBucket();
-            return null;
-        }
         if (treeBucketKeys != null) {
             E key = (E) treeBucketKeys[treeBucketCursor++];
             lastReturnedKey = key;
-            currentIsNull = false;
             canRemove = true;
             if (treeBucketCursor >= treeBucketKeys.length) {
                 treeBucketKeys = null;
@@ -89,7 +75,6 @@ final class HashIterator<E> implements Iterator<E> {
             throw new NoSuchElementException();
         }
         lastReturnedKey = e.key;
-        currentIsNull = false;
         canRemove = true;
         if ((next = e.next) == null) {
             advanceToNextBucket();
@@ -111,14 +96,8 @@ final class HashIterator<E> implements Iterator<E> {
             throw new IllegalStateException();
         }
         canRemove = false;
-
-        if (currentIsNull) {
-            set.remove(null);
-            currentIsNull = false;
-        } else {
-            set.remove(lastReturnedKey);
-            lastReturnedKey = null;
-        }
+        set.remove(lastReturnedKey);
+        lastReturnedKey = null;
         expectedModCount = set.modCount;
     }
 
