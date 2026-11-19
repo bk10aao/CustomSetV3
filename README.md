@@ -1,33 +1,31 @@
 ## Custom Set V3
 
-Implementation of a Set using a custom Red-Black tree. The standard JDK version is a wrapper of a JDK `HashMap` and 
-therefore stores both key and value; this version is backed similarly, yet only requiring the value, minimizing memory 
+Implementation of a Set using a custom Red-Black tree. The standard JDK version is a wrapper of a JDK `HashMap` and
+therefore stores both key and value; this version is backed similarly, yet only requiring the value, minimizing memory
 overhead by 25%.
 
 ## Table of Contents
 
 - [Build and Test](#build-and-test)
 - [Performance Advantages & Architectural Optimizations](#performance-advantages--architectural-optimizations)
+- [Trade-Offs & Architectural Limitations](#trade-offs--architectural-limitations)
+- [Related Versions](#related-versions)
 - [Time Complexity](#time-complexity)
 - [Space Complexity](#space-complexity)
 - [Performance](#performance)
-    - [V3 vs JDK HashSet](#v3-vs-jdk-hashset)
-    - [V3 vs V2](#v3-vs-v2)
-    - [V3 vs V1](#v3-vs-v1)
+  - [V3 vs JDK HashSet](#v3-vs-jdk-hashset)
+  - [V3 vs V2](#v3-vs-v2)
+  - [V3 vs V1](#v3-vs-v1)
 - [Performance Testing](#performance-testing)
-    - [Heat Maps](#heat-maps)
-    - [Geometric](#geometric)
+  - [Heat Maps](#heat-maps)
+  - [Geometric Mean Comparisons](#geometric-mean-comparisons)
 - [Grouped Graphs](#grouped-graphs)
 - [Individual Graphs](#individual-graphs)
 
 ## Build and Test
 
 1. To build and test the project run command `./gradlew clean build`
-2. To test the project run command ` ./gradlew clean test`
-
-## Performance Advantages & Architectural Optimizations
-
-## Performance Advantages & Architectural Optimizations
+2. To test the project run command `./gradlew clean test`
 
 ## Performance Advantages & Architectural Optimizations
 
@@ -126,59 +124,60 @@ overhead by 25%.
 
 ## Trade-Offs & Architectural Limitations
 
-While `CustomSetV3` delivers significant performance and memory improvements over the standard JDK implementation, these 
+While `CustomSetV3` delivers significant performance and memory improvements over the standard JDK implementation, these
 gains come with specific design trade-offs:
 
 ### 1. The `retainAll` Temporary Heap Allocation Trap
-- **The Bottleneck:** When calling `retainAll(Collection c)` where the incoming collection is not already a `Set`, V3 
-instantiates a temporary `CustomSet` on the heap 
-(`final Collection<?> retainValues = (c instanceof Set) ? c : new CustomSet<>(c);`).
+- **The Bottleneck:** When calling `retainAll(Collection c)` where the incoming collection is not already a `Set`, V3
+  instantiates a temporary `CustomSet` on the heap
+  (`final Collection<?> retainValues = (c instanceof Set) ? c : new CustomSet<>(c);`).
 
-- **The Trade-Off:** While this drops algorithmic time complexity from $O(N \cdot M)$ down to $O(N + M)$, it forces an 
-immediate $O(M)$ memory allocation and generates transient garbage collection (GC) pressure. Frequent calls to 
-`retainAll` on large non-set collections can thrash the 
-[Eden space (Oracle JVM Heap Architecture)](https://docs.oracle.com/cd/E19146-01/820-7979/ggkge/index.html).
+- **The Trade-Off:** While this drops algorithmic time complexity from $O(N \cdot M)$ down to $O(N + M)$, it forces an
+  immediate $O(M)$ memory allocation and generates transient garbage collection (GC) pressure. Frequent calls to
+  `retainAll` on large non-set collections can thrash the
+  [Eden space (Oracle JVM Heap Architecture)](https://docs.oracle.com/cd/E19146-01/820-7979/ggkge/index.html).
 
 ### 2. `TreeNode` Memory Bloat Under Adversarial Workloads
-- **The Bottleneck:** To protect against worst-case $O(N)$ hash-collision degradation, heavy collision bins 
-automatically treeify into Red-Black trees (`TreeNode`).
+- **The Bottleneck:** To protect against worst-case $O(N)$ hash-collision degradation, heavy collision bins
+  automatically treeify into Red-Black trees (`TreeNode`).
 
-- **The Trade-Off:** A `TreeNode` carries significantly more memory overhead than a standard `Node` because it maintains 
-parent, left, right, previous, and color pointers. Under a malicious hash-flooding attack or high-collision workload, 
-per-entry memory footprints balloon, negating the memory-saving benefits of avoiding JDK's `HashMap.Node` wrapper.
+- **The Trade-Off:** A `TreeNode` carries significantly more memory overhead than a standard `Node` because it maintains
+  parent, left, right, previous, and color pointers. Under a malicious hash-flooding attack or high-collision workload,
+  per-entry memory footprints balloon, negating the memory-saving benefits of avoiding JDK's `HashMap.Node` wrapper.
 
 ### 3. Maintenance Risk in Manual `clone()` Logic
-- **The Bottleneck:** The `clone()` method is implemented manually by walking the source table, bifurcating logic 
-between standard nodes and tree nodes, rebuilding linked lists via tail pointers, and explicitly re-invoking 
-`.treeify(dst)` on cloned tree bins.
+- **The Bottleneck:** The `clone()` method is implemented manually by walking the source table, bifurcating logic
+  between standard nodes and tree nodes, rebuilding linked lists via tail pointers, and explicitly re-invoking
+  `.treeify(dst)` on cloned tree bins.
 
-- **The Trade-Off:** This presents a long-term maintenance liability. Any future refactoring of node linkage rules, 
-parent pointers, or balancing invariants requires synchronized, manual updates inside `clone()`. Bypassing cleaner 
-factory or serialization cloning patterns leaves a potential vector for silent pointer corruption if an edge-case link 
-is missed.
+- **The Trade-Off:** This presents a long-term maintenance liability. Any future refactoring of node linkage rules,
+  parent pointers, or balancing invariants requires synchronized, manual updates inside `clone()`. Bypassing cleaner
+  factory or serialization cloning patterns leaves a potential vector for silent pointer corruption if an edge-case link
+  is missed.
 
 ### 4. Reactive, Non-Thread-Safe Fail-Fast (`modCount`)
-- **The Bottleneck:** Like standard JDK collections, V3 relies on `modCount` to trigger a 
-`ConcurrentModificationException` when structural mutations occur during iteration.
+- **The Bottleneck:** Like standard JDK collections, V3 relies on `modCount` to trigger a
+  `ConcurrentModificationException` when structural mutations occur during iteration.
 
-- **The Trade-Off:** This mechanism is strictly reactive rather than proactive or thread-safe. Without external 
-synchronization, concurrent multi-threaded access will corrupt non-atomic pointer updates (`size++`, table resizing) 
-long before a `ConcurrentModificationException` is thrown. Developers sharing sets across threads without external 
-locking will encounter silent data corruption rather than safe thread isolation.
+- **The Trade-Off:** This mechanism is strictly reactive rather than proactive or thread-safe. Without external
+  synchronization, concurrent multi-threaded access will corrupt non-atomic pointer updates (`size++`, table resizing)
+  long before a `ConcurrentModificationException` is thrown. Developers sharing sets across threads without external
+  locking will encounter silent data corruption rather than safe thread isolation.
 
 ### 5. Reliance on Third-Party Set Contracts in `equals()`
-- **The Bottleneck:** The `equals(Object o)` implementation verifies size equality and delegates containment checking 
-via `containsAll(other)`.
+- **The Bottleneck:** The `equals(Object o)` implementation verifies size equality and delegates containment checking
+  via `containsAll(other)`.
 
-- **The Trade-Off:** The implementation blindly trusts the contract of any arbitrary third-party `Set` implementation 
-passed in. If `other` is a poorly written custom collection whose `size()` lies or whose `contains()` method introduces 
-side effects or non-deterministic behavior, the set's entire equality contract breaks down.
+- **The Trade-Off:** The implementation blindly trusts the contract of any arbitrary third-party `Set` implementation
+  passed in. If `other` is a poorly written custom collection whose `size()` lies or whose `contains()` method introduces
+  side effects or non-deterministic behavior, the set's entire equality contract breaks down.
 
-Version 1 being an array back version can be found [here](https://github.com/bk10aao/CustomSet).
+## Related Versions
 
-Version 2 being back by a Java HashMap can be found [here](https://github.com/bk10aao/CustomSetV2).
+- **Version 1** (array-backed implementation) can be found [here](https://github.com/bk10aao/CustomSet).
+- **Version 2** (backed by a Java `HashMap`) can be found [here](https://github.com/bk10aao/CustomSetV2).
 
-All methods implemented are identical to those found in the Java 
+All methods implemented are identical to those found in the Java
 [Set](https://docs.oracle.com/javase/8/docs/api/java/util/Set.html) interface.
 
 ## Time Complexity
@@ -327,123 +326,143 @@ All methods implemented are identical to those found in the Java
 <b>Note: The following performance charts are designed to be viewed in dark mode.</b>
 
 ### Heat Maps
-![Heatmap](PerformanceTesting/V3_JDK/heatmap.png)
-![Heatmap](PerformanceTesting/V2_V3/heatmap.png)
-![Heatmap](PerformanceTesting/V1_V3/heatmap.png)
+![V3 vs JDK Heatmap](PerformanceTesting/V3_JDK/heatmap.png)
+![V3 vs V2 Heatmap](PerformanceTesting/V2_V3/heatmap.png)
+![V3 vs V1 Heatmap](PerformanceTesting/V1_V3/heatmap.png)
 
-### Geometric
-![Geometric](PerformanceTesting/V3_JDK/geometric.png)
-![Geometric](PerformanceTesting/V2_V3/geometric.png)
-![Geometric](PerformanceTesting/V1_V3/geometric.png)
-
+### Geometric Mean Comparisons
+![V3 vs JDK Geometric Mean](PerformanceTesting/V3_JDK/geometric.png)
+![V3 vs V2 Geometric Mean](PerformanceTesting/V2_V3/geometric.png)
+![V3 vs V1 Geometric Mean](PerformanceTesting/V1_V3/geometric.png)
 
 ## Grouped Graphs
 
-### V1 vs V2 vs V3 vs JDK
-![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/grid.png)
+### V1 vs V2 vs V3 vs JDK Grid
+![V1 vs V2 vs V3 vs JDK Grid](PerformanceTesting/V1_V2_V3_JDK/grid.png)
 
-### V3 vs JDK
-![Combined Performance Charts](PerformanceTesting/V3_JDK/grid.png)
+### V3 vs JDK Grid
+![V3 vs JDK Grid](PerformanceTesting/V3_JDK/grid.png)
 
-### V3 vs V2
-![Combined Performance Charts](PerformanceTesting/V2_V3/grid.png)
+### V3 vs V2 Grid
+![V3 vs V2 Grid](PerformanceTesting/V2_V3/grid.png)
 
-### V3 vs V1
-![Combined Performance Charts](PerformanceTesting/V1_V3/grid.png)
+### V3 vs V1 Grid
+![V3 vs V1 Grid](PerformanceTesting/V1_V3/grid.png)
 
 ## Individual Graphs
+
 ### V1 vs V2 vs V3 vs JDK Performance
-![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/constructor.png)
-![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/constructorCapacity.png)
-![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/constructorCapacityLoadFactor.png)
-![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/constructorCollection.png)
-![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/add.png)
-![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/addAll.png)
-![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/clear.png)
-![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/clone.png)
-![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/contains.png)
-![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/containsAll.png)
-![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/equals.png)
-![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/hashCode.png)
-![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/isEmpty.png)
-![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/iterator.png)
-![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/remove.png)
-![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/removeAll.png)
-![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/retainAll.png)
-![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/size.png)
-![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/spliterator.png)
-![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/toArray.png)
-![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/toArrayT.png)
-![Combined Performance Charts](PerformanceTesting/V1_V2_V3_JDK/toString.png)
+<details>
+<summary>Click to expand V1 vs V2 vs V3 vs JDK Performance charts (22 methods)</summary>
+
+![constructor() — V1 vs V2 vs V3 vs JDK Performance](PerformanceTesting/V1_V2_V3_JDK/constructor.png)
+![constructor(int) — V1 vs V2 vs V3 vs JDK Performance](PerformanceTesting/V1_V2_V3_JDK/constructorCapacity.png)
+![constructor(int, double) — V1 vs V2 vs V3 vs JDK Performance](PerformanceTesting/V1_V2_V3_JDK/constructorCapacityLoadFactor.png)
+![constructor(Collection) — V1 vs V2 vs V3 vs JDK Performance](PerformanceTesting/V1_V2_V3_JDK/constructorCollection.png)
+![add(E) — V1 vs V2 vs V3 vs JDK Performance](PerformanceTesting/V1_V2_V3_JDK/add.png)
+![addAll(Collection) — V1 vs V2 vs V3 vs JDK Performance](PerformanceTesting/V1_V2_V3_JDK/addAll.png)
+![clear() — V1 vs V2 vs V3 vs JDK Performance](PerformanceTesting/V1_V2_V3_JDK/clear.png)
+![clone() — V1 vs V2 vs V3 vs JDK Performance](PerformanceTesting/V1_V2_V3_JDK/clone.png)
+![contains(Object) — V1 vs V2 vs V3 vs JDK Performance](PerformanceTesting/V1_V2_V3_JDK/contains.png)
+![containsAll(Collection) — V1 vs V2 vs V3 vs JDK Performance](PerformanceTesting/V1_V2_V3_JDK/containsAll.png)
+![equals(Object) — V1 vs V2 vs V3 vs JDK Performance](PerformanceTesting/V1_V2_V3_JDK/equals.png)
+![hashCode() — V1 vs V2 vs V3 vs JDK Performance](PerformanceTesting/V1_V2_V3_JDK/hashCode.png)
+![isEmpty() — V1 vs V2 vs V3 vs JDK Performance](PerformanceTesting/V1_V2_V3_JDK/isEmpty.png)
+![iterator() — V1 vs V2 vs V3 vs JDK Performance](PerformanceTesting/V1_V2_V3_JDK/iterator.png)
+![remove(Object) — V1 vs V2 vs V3 vs JDK Performance](PerformanceTesting/V1_V2_V3_JDK/remove.png)
+![removeAll(Collection) — V1 vs V2 vs V3 vs JDK Performance](PerformanceTesting/V1_V2_V3_JDK/removeAll.png)
+![retainAll(Collection) — V1 vs V2 vs V3 vs JDK Performance](PerformanceTesting/V1_V2_V3_JDK/retainAll.png)
+![size() — V1 vs V2 vs V3 vs JDK Performance](PerformanceTesting/V1_V2_V3_JDK/size.png)
+![spliterator() — V1 vs V2 vs V3 vs JDK Performance](PerformanceTesting/V1_V2_V3_JDK/spliterator.png)
+![toArray() — V1 vs V2 vs V3 vs JDK Performance](PerformanceTesting/V1_V2_V3_JDK/toArray.png)
+![toArray(T[]) — V1 vs V2 vs V3 vs JDK Performance](PerformanceTesting/V1_V2_V3_JDK/toArrayT.png)
+![toString() — V1 vs V2 vs V3 vs JDK Performance](PerformanceTesting/V1_V2_V3_JDK/toString.png)
+
+</details>
 
 ### V3 vs JDK Performance
-![Combined Performance Charts](PerformanceTesting/V3_JDK/constructor.png)
-![Combined Performance Charts](PerformanceTesting/V3_JDK/constructorCapacity.png)
-![Combined Performance Charts](PerformanceTesting/V3_JDK/constructorCapacityLoadFactor.png)
-![Combined Performance Charts](PerformanceTesting/V3_JDK/constructorCollection.png)
-![Combined Performance Charts](PerformanceTesting/V3_JDK/add.png)
-![Combined Performance Charts](PerformanceTesting/V3_JDK/addAll.png)
-![Combined Performance Charts](PerformanceTesting/V3_JDK/clear.png)
-![Combined Performance Charts](PerformanceTesting/V3_JDK/clone.png)
-![Combined Performance Charts](PerformanceTesting/V3_JDK/contains.png)
-![Combined Performance Charts](PerformanceTesting/V3_JDK/containsAll.png)
-![Combined Performance Charts](PerformanceTesting/V3_JDK/equals.png)
-![Combined Performance Charts](PerformanceTesting/V3_JDK/hashCode.png)
-![Combined Performance Charts](PerformanceTesting/V3_JDK/isEmpty.png)
-![Combined Performance Charts](PerformanceTesting/V3_JDK/iterator.png)
-![Combined Performance Charts](PerformanceTesting/V3_JDK/remove.png)
-![Combined Performance Charts](PerformanceTesting/V3_JDK/removeAll.png)
-![Combined Performance Charts](PerformanceTesting/V3_JDK/retainAll.png)
-![Combined Performance Charts](PerformanceTesting/V3_JDK/size.png)
-![Combined Performance Charts](PerformanceTesting/V3_JDK/spliterator.png)
-![Combined Performance Charts](PerformanceTesting/V3_JDK/toArray.png)
-![Combined Performance Charts](PerformanceTesting/V3_JDK/toArrayT.png)
-![Combined Performance Charts](PerformanceTesting/V3_JDK/toString.png)
+<details>
+<summary>Click to expand V3 vs JDK Performance charts (22 methods)</summary>
+
+![constructor() — V3 vs JDK Performance](PerformanceTesting/V3_JDK/constructor.png)
+![constructor(int) — V3 vs JDK Performance](PerformanceTesting/V3_JDK/constructorCapacity.png)
+![constructor(int, double) — V3 vs JDK Performance](PerformanceTesting/V3_JDK/constructorCapacityLoadFactor.png)
+![constructor(Collection) — V3 vs JDK Performance](PerformanceTesting/V3_JDK/constructorCollection.png)
+![add(E) — V3 vs JDK Performance](PerformanceTesting/V3_JDK/add.png)
+![addAll(Collection) — V3 vs JDK Performance](PerformanceTesting/V3_JDK/addAll.png)
+![clear() — V3 vs JDK Performance](PerformanceTesting/V3_JDK/clear.png)
+![clone() — V3 vs JDK Performance](PerformanceTesting/V3_JDK/clone.png)
+![contains(Object) — V3 vs JDK Performance](PerformanceTesting/V3_JDK/contains.png)
+![containsAll(Collection) — V3 vs JDK Performance](PerformanceTesting/V3_JDK/containsAll.png)
+![equals(Object) — V3 vs JDK Performance](PerformanceTesting/V3_JDK/equals.png)
+![hashCode() — V3 vs JDK Performance](PerformanceTesting/V3_JDK/hashCode.png)
+![isEmpty() — V3 vs JDK Performance](PerformanceTesting/V3_JDK/isEmpty.png)
+![iterator() — V3 vs JDK Performance](PerformanceTesting/V3_JDK/iterator.png)
+![remove(Object) — V3 vs JDK Performance](PerformanceTesting/V3_JDK/remove.png)
+![removeAll(Collection) — V3 vs JDK Performance](PerformanceTesting/V3_JDK/removeAll.png)
+![retainAll(Collection) — V3 vs JDK Performance](PerformanceTesting/V3_JDK/retainAll.png)
+![size() — V3 vs JDK Performance](PerformanceTesting/V3_JDK/size.png)
+![spliterator() — V3 vs JDK Performance](PerformanceTesting/V3_JDK/spliterator.png)
+![toArray() — V3 vs JDK Performance](PerformanceTesting/V3_JDK/toArray.png)
+![toArray(T[]) — V3 vs JDK Performance](PerformanceTesting/V3_JDK/toArrayT.png)
+![toString() — V3 vs JDK Performance](PerformanceTesting/V3_JDK/toString.png)
+
+</details>
 
 ### V3 vs V2 Performance
-![Combined Performance Charts](PerformanceTesting/V2_V3/constructor.png)
-![Combined Performance Charts](PerformanceTesting/V2_V3/constructorCapacity.png)
-![Combined Performance Charts](PerformanceTesting/V2_V3/constructorCapacityLoadFactor.png)
-![Combined Performance Charts](PerformanceTesting/V2_V3/constructorCollection.png)
-![Combined Performance Charts](PerformanceTesting/V2_V3/add.png)
-![Combined Performance Charts](PerformanceTesting/V2_V3/addAll.png)
-![Combined Performance Charts](PerformanceTesting/V2_V3/clear.png)
-![Combined Performance Charts](PerformanceTesting/V2_V3/clone.png)
-![Combined Performance Charts](PerformanceTesting/V2_V3/contains.png)
-![Combined Performance Charts](PerformanceTesting/V2_V3/containsAll.png)
-![Combined Performance Charts](PerformanceTesting/V2_V3/equals.png)
-![Combined Performance Charts](PerformanceTesting/V2_V3/hashCode.png)
-![Combined Performance Charts](PerformanceTesting/V2_V3/isEmpty.png)
-![Combined Performance Charts](PerformanceTesting/V2_V3/iterator.png)
-![Combined Performance Charts](PerformanceTesting/V2_V3/remove.png)
-![Combined Performance Charts](PerformanceTesting/V2_V3/removeAll.png)
-![Combined Performance Charts](PerformanceTesting/V2_V3/retainAll.png)
-![Combined Performance Charts](PerformanceTesting/V2_V3/size.png)
-![Combined Performance Charts](PerformanceTesting/V2_V3/spliterator.png)
-![Combined Performance Charts](PerformanceTesting/V2_V3/toArray.png)
-![Combined Performance Charts](PerformanceTesting/V2_V3/toArrayT.png)
-![Combined Performance Charts](PerformanceTesting/V2_V3/toString.png)
+<details>
+<summary>Click to expand V3 vs V2 Performance charts (22 methods)</summary>
+
+![constructor() — V3 vs V2 Performance](PerformanceTesting/V2_V3/constructor.png)
+![constructor(int) — V3 vs V2 Performance](PerformanceTesting/V2_V3/constructorCapacity.png)
+![constructor(int, double) — V3 vs V2 Performance](PerformanceTesting/V2_V3/constructorCapacityLoadFactor.png)
+![constructor(Collection) — V3 vs V2 Performance](PerformanceTesting/V2_V3/constructorCollection.png)
+![add(E) — V3 vs V2 Performance](PerformanceTesting/V2_V3/add.png)
+![addAll(Collection) — V3 vs V2 Performance](PerformanceTesting/V2_V3/addAll.png)
+![clear() — V3 vs V2 Performance](PerformanceTesting/V2_V3/clear.png)
+![clone() — V3 vs V2 Performance](PerformanceTesting/V2_V3/clone.png)
+![contains(Object) — V3 vs V2 Performance](PerformanceTesting/V2_V3/contains.png)
+![containsAll(Collection) — V3 vs V2 Performance](PerformanceTesting/V2_V3/containsAll.png)
+![equals(Object) — V3 vs V2 Performance](PerformanceTesting/V2_V3/equals.png)
+![hashCode() — V3 vs V2 Performance](PerformanceTesting/V2_V3/hashCode.png)
+![isEmpty() — V3 vs V2 Performance](PerformanceTesting/V2_V3/isEmpty.png)
+![iterator() — V3 vs V2 Performance](PerformanceTesting/V2_V3/iterator.png)
+![remove(Object) — V3 vs V2 Performance](PerformanceTesting/V2_V3/remove.png)
+![removeAll(Collection) — V3 vs V2 Performance](PerformanceTesting/V2_V3/removeAll.png)
+![retainAll(Collection) — V3 vs V2 Performance](PerformanceTesting/V2_V3/retainAll.png)
+![size() — V3 vs V2 Performance](PerformanceTesting/V2_V3/size.png)
+![spliterator() — V3 vs V2 Performance](PerformanceTesting/V2_V3/spliterator.png)
+![toArray() — V3 vs V2 Performance](PerformanceTesting/V2_V3/toArray.png)
+![toArray(T[]) — V3 vs V2 Performance](PerformanceTesting/V2_V3/toArrayT.png)
+![toString() — V3 vs V2 Performance](PerformanceTesting/V2_V3/toString.png)
+
+</details>
 
 ### V3 vs V1 Performance
-![Combined Performance Charts](PerformanceTesting/V1_V3/constructor.png)
-![Combined Performance Charts](PerformanceTesting/V1_V3/constructorCapacity.png)
-![Combined Performance Charts](PerformanceTesting/V1_V3/constructorCapacityLoadFactor.png)
-![Combined Performance Charts](PerformanceTesting/V1_V3/constructorCollection.png)
-![Combined Performance Charts](PerformanceTesting/V1_V3/add.png)
-![Combined Performance Charts](PerformanceTesting/V1_V3/addAll.png)
-![Combined Performance Charts](PerformanceTesting/V1_V3/clear.png)
-![Combined Performance Charts](PerformanceTesting/V1_V3/clone.png)
-![Combined Performance Charts](PerformanceTesting/V1_V3/contains.png)
-![Combined Performance Charts](PerformanceTesting/V1_V3/containsAll.png)
-![Combined Performance Charts](PerformanceTesting/V1_V3/equals.png)
-![Combined Performance Charts](PerformanceTesting/V1_V3/hashCode.png)
-![Combined Performance Charts](PerformanceTesting/V1_V3/isEmpty.png)
-![Combined Performance Charts](PerformanceTesting/V1_V3/iterator.png)
-![Combined Performance Charts](PerformanceTesting/V1_V3/remove.png)
-![Combined Performance Charts](PerformanceTesting/V1_V3/removeAll.png)
-![Combined Performance Charts](PerformanceTesting/V1_V3/retainAll.png)
-![Combined Performance Charts](PerformanceTesting/V1_V3/size.png)
-![Combined Performance Charts](PerformanceTesting/V1_V3/spliterator.png)
-![Combined Performance Charts](PerformanceTesting/V1_V3/toArray.png)
-![Combined Performance Charts](PerformanceTesting/V1_V3/toArrayT.png)
-![Combined Performance Charts](PerformanceTesting/V1_V3/toString.png)
+<details>
+<summary>Click to expand V3 vs V1 Performance charts (22 methods)</summary>
+
+![constructor() — V3 vs V1 Performance](PerformanceTesting/V1_V3/constructor.png)
+![constructor(int) — V3 vs V1 Performance](PerformanceTesting/V1_V3/constructorCapacity.png)
+![constructor(int, double) — V3 vs V1 Performance](PerformanceTesting/V1_V3/constructorCapacityLoadFactor.png)
+![constructor(Collection) — V3 vs V1 Performance](PerformanceTesting/V1_V3/constructorCollection.png)
+![add(E) — V3 vs V1 Performance](PerformanceTesting/V1_V3/add.png)
+![addAll(Collection) — V3 vs V1 Performance](PerformanceTesting/V1_V3/addAll.png)
+![clear() — V3 vs V1 Performance](PerformanceTesting/V1_V3/clear.png)
+![clone() — V3 vs V1 Performance](PerformanceTesting/V1_V3/clone.png)
+![contains(Object) — V3 vs V1 Performance](PerformanceTesting/V1_V3/contains.png)
+![containsAll(Collection) — V3 vs V1 Performance](PerformanceTesting/V1_V3/containsAll.png)
+![equals(Object) — V3 vs V1 Performance](PerformanceTesting/V1_V3/equals.png)
+![hashCode() — V3 vs V1 Performance](PerformanceTesting/V1_V3/hashCode.png)
+![isEmpty() — V3 vs V1 Performance](PerformanceTesting/V1_V3/isEmpty.png)
+![iterator() — V3 vs V1 Performance](PerformanceTesting/V1_V3/iterator.png)
+![remove(Object) — V3 vs V1 Performance](PerformanceTesting/V1_V3/remove.png)
+![removeAll(Collection) — V3 vs V1 Performance](PerformanceTesting/V1_V3/removeAll.png)
+![retainAll(Collection) — V3 vs V1 Performance](PerformanceTesting/V1_V3/retainAll.png)
+![size() — V3 vs V1 Performance](PerformanceTesting/V1_V3/size.png)
+![spliterator() — V3 vs V1 Performance](PerformanceTesting/V1_V3/spliterator.png)
+![toArray() — V3 vs V1 Performance](PerformanceTesting/V1_V3/toArray.png)
+![toArray(T[]) — V3 vs V1 Performance](PerformanceTesting/V1_V3/toArrayT.png)
+![toString() — V3 vs V1 Performance](PerformanceTesting/V1_V3/toString.png)
+
+</details>
