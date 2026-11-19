@@ -1,7 +1,7 @@
 ## Custom Set V3
 
 Implementation of a Set using a custom Red-Black tree. The standard JDK version is a wrapper of a JDK `HashMap` and
-therefore stores both key and value; this version is backed similarly, yet only requiring the value, minimizing memory
+therefore stores both key and value; this version is backed similarly, yet only requiring the key, minimizing memory
 overhead by 25%.
 
 ## Table of Contents
@@ -29,7 +29,7 @@ overhead by 25%.
 
 ## Performance Advantages & Architectural Optimizations
 
-CustomSetV3 is a memory-conscious, HashMap-style set that keeps the same asymptotic behaviour as JDK `HashSet` while eliminating the dummy value field and adding proper \(O(N+M)\) bulk operations against non-set collections.
+CustomSetV3 is a memory-conscious, HashMap-style set that keeps the same asymptotic behaviour as JDK `HashSet` while eliminating the dummy value field and adding proper $O(N + M)$ bulk operations against non-set collections for `retainAll`.
 
 ### 1. Leaner Entry Storage
 JDK `HashSet` is a thin wrapper over `HashMap`. Every element is stored in a `HashMap.Node` that also holds a dummy value reference (`PRESENT`).  
@@ -37,14 +37,15 @@ JDK `HashSet` is a thin wrapper over `HashMap`. Every element is stored in a `Ha
 
 ### 2. Pre-sizing on `addAll` / collection constructors
 `HashSet(Collection)` already pre-sizes, but `HashSet.addAll` does not.  
-`CustomSet` calculates the required capacity up-front with the same formula used by the JDK constructors (`tableSizeFor((int)(c.size() / loadFactor) + 1)`), eliminating intermediate resizes during bulk insertion.
+`CustomSet` estimates required capacity up-front via `tableSizeFor` and load-factor scaling (clamping to `MAXIMUM_CAPACITY` and `DEFAULT_INITIAL_CAPACITY` in the collection constructor), reducing intermediate resizes during bulk insertion.
 
-### 3. Optimised bulk set operations on non-Set arguments
-Both `retainAll` and `removeAll` convert a plain `Collection`/`List` into a temporary `CustomSet` (or reuse the argument when it is already a `Set`). This turns an \(O(N\cdot M)\) nested scan into an \(O(N+M)\) pass.  
-Against large lists the measured speedup exceeds 500×. Against an argument that is already a set the conversion is skipped.
+### 3. Optimised `retainAll` on non-`CustomSet` arguments
+`retainAll` converts any argument that is not already a `CustomSet` into a temporary `CustomSet`, turning an $O(N \cdot M)$ nested scan into an $O(N + M)$ lookup pass.  
+Against large lists the measured speedup exceeds 500×. When the argument is already a `CustomSet`, the temporary allocation is skipped.  
+(`removeAll` keeps the classic size-based heuristic and does **not** perform this conversion.)
 
 ### 4. Single-pass table walk for bulk removal
-`removeMatching` walks the hash table once and unlinks nodes in place. Combined with the conversion above, both bulk removal operations avoid the classic “iterator + repeated contains” pattern.
+`removeMatching` walks the hash table once and unlinks nodes in place. When used by `retainAll` (after the conversion above) it avoids the classic “iterator + repeated contains” pattern.
 
 ### 5. Proven HashMap techniques (parity, not advantage)
 The following are intentional mirrors of modern OpenJDK `HashMap` and therefore deliver the same asymptotic behaviour:
@@ -58,28 +59,27 @@ The following are intentional mirrors of modern OpenJDK `HashMap` and therefore 
 They are listed for completeness, not as improvements over the JDK.
 
 ### 6. Tree bins remain linked-list traversable
-Every `TreeNode` keeps the classic `next`/`previous` links. Consequently the iterator and spliterator never have to special-case tree structure except for a one-time key snapshot when a tree bin is first encountered. The common-case path stays simple and iteration order within a bin remains stable across treeification.
+Every `TreeNode` keeps the classic `next`/`previous` links. Consequently, the iterator and spliterator never have to special-case tree structure except for a one-time key snapshot when a tree bin is first encountered. The common-case path stays simple and iteration order within a bin remains stable across treeification.
 
 ### 7. Clean serialisation
-`size` and `threshold` are marked `transient`. `writeObject`/`readObject` therefore emit only the essential capacity, element count and the elements themselves, avoiding the redundant metadata that would otherwise be written by `defaultWriteObject`.
+`size` and `threshold` (in addition to `table` and `modCount`) are marked `transient`.  
+`writeObject`/`readObject` therefore emit only the essential capacity, element count and the elements themselves, avoiding the redundant metadata that would otherwise be written by `defaultWriteObject`.
 
 ### 8. Independent of HashMap
 The implementation does not wrap or depend on `java.util.HashMap`. This keeps the artefact smaller and allows the node layout or tree policy to evolve independently if required.
 
----
-
 ## Trade-Offs & Architectural Limitations
 
-### 1. Temporary allocation on bulk set operations
-Converting a non-set argument allocates an \(O(M)\) temporary set. The allocation is short-lived, but repeated calls on large collections increase young-gen GC pressure.  
-(The conversion is skipped when the argument is already a `Set`.)
+### 1. Temporary allocation on `retainAll`
+Converting a non-`CustomSet` argument allocates an $O(M)$ temporary set. The allocation is short-lived, but repeated calls on large collections increase young-gen GC pressure.  
+(The conversion is skipped when the argument is already a `CustomSet`.)
 
 ### 2. TreeNode memory cost under high collision
 A `TreeNode` carries parent/left/right/previous/colour pointers. Under adversarial or poorly-hashed workloads the per-entry footprint grows and the original memory advantage disappears. (The same trade-off exists in the JDK.)  
-In addition, the \(O(\log N)\) guarantee only fully holds for `Comparable` keys; non-Comparable keys still fall back to linear search inside a tree bin (exactly as in OpenJDK).
+In addition, the $O(\log N)$ guarantee only fully holds for `Comparable` keys; non-Comparable keys still fall back to linear search inside a tree bin (exactly as in OpenJDK).
 
 ### 3. Iterator allocates on tree bins
-The “zero-allocation” claim holds only for ordinary collision chains. Hitting a tree bin forces an `Object[]` key snapshot. The JDK iterator never does this; it simply follows the `next` links.
+Zero-allocation traversal applies to ordinary collision chains. Stepping into a `TreeNode` bin captures an `Object[]` key snapshot in `HashIterator` so `remove()`—which can trigger tree rotations or untreeification—does not disrupt iteration.
 
 ### 4. Manual `clone()` surface
 `clone()` walks the table, rebuilds lists and re-treeifies bins by hand. Any future change to node linkage or balancing invariants must be mirrored here. Serialisation goes through the normal `add` path and therefore obtains treeification for free; `clone()` is the sole maintenance hotspot. Prefer a copy-constructor or the serialisation path if the manual implementation ever becomes painful.  
@@ -89,7 +89,7 @@ Note that `clone()` copies the current table length; a sparsely-filled set there
 `modCount` provides the same best-effort concurrent-modification detection as the JDK collections. It is not a substitute for external synchronisation; concurrent mutation can still corrupt the structure before a `ConcurrentModificationException` is thrown.
 
 ### 6. Fixed load factor and capacity ceiling
-The load factor is final after construction (identical to `HashMap`). The table is hard-capped at \(2^{30}\) buckets, again matching the JDK limit.
+`loadFactor` is `final` after construction (matching `HashMap`), and table capacity is capped at `MAXIMUM_CAPACITY` ($2^{30}$ buckets), matching the JDK limit.
 
 ## Related Versions
 
