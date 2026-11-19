@@ -25,7 +25,11 @@ FILES = {
     'JDK': 'HashSet_performance.csv',
 }
 
+<<<<<<< HEAD
 OUTPUT_FILE = 'performance_grid_comparison.png'
+=======
+OUTPUT_FILE = 'grid.png'
+>>>>>>> 140327b2ffcb9ff3b18628b5dfcff9594182d32d
 
 COLORS = {
     'V1': '#2ECFBF',       # Neon Teal
