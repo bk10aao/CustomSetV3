@@ -178,21 +178,24 @@ def main():
     fig.suptitle('CustomSet Performance Comparison Grid (V1 vs V2 vs V3 vs JDK)',
                  color='white', fontsize=16, fontweight='bold', y=0.98)
 
-    fig.legend(
+    legend = fig.legend(
         handles=legend_elements,
         loc='upper center',
         bbox_to_anchor=(0.5, 0.95),
         ncol=len(datasets),
         frameon=False,
         fontsize=12,
+        labelcolor='white',
         handlelength=1.5,
         handletextpad=0.6,
         columnspacing=3.0
     )
+    for text in legend.get_texts():
+        text.set_color('white')
 
     plt.tight_layout(rect=[0, 0.02, 1, 0.93])
     fig.savefig(
-        OUTPUT_OUTPUT_FILE := OUTPUT_FILE,
+        OUTPUT_FILE,
         dpi=DPI,
         transparent=True,
         bbox_inches='tight',
