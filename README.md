@@ -29,148 +29,67 @@ overhead by 25%.
 
 ## Performance Advantages & Architectural Optimizations
 
-### 1. Direct Entry Storage vs. JDK Wrapper Overhead (`constructor`, `add`)
-- **The JDK Bottleneck:** The standard JDK `HashSet` delegates storage internally to a `HashMap`. Every unique element
-  inserted into a `HashSet` is wrapped inside a separate `HashMap.Node` object, which in turn points to a shared static
-  dummy presentation value. This creates massive object allocation overhead, increases heap memory pressure, and
-  introduces scattered memory references that cause CPU cache misses during traversal.
+CustomSetV3 is a memory-conscious, HashMap-style set that keeps the same asymptotic behaviour as JDK `HashSet` while eliminating the dummy value field and adding proper \(O(N+M)\) bulk operations against non-set collections.
 
-- **V3 Advantage:** `CustomSet` bypasses wrapper objects entirely by storing entry keys directly inside lightweight
-  `Node` and `TreeNode` instances within the primary hash table array. This structural optimization slashes heap
-  allocation overhead, improves memory locality, and accelerates wall-clock execution times across bulk operations.
+### 1. Leaner Entry Storage
+JDK `HashSet` is a thin wrapper over `HashMap`. Every element is stored in a `HashMap.Node` that also holds a dummy value reference (`PRESENT`).  
+`CustomSet` stores only the key (plus hash and next/tree pointers). Under compressed oops this is typically ~8 bytes less per entry in ordinary (non-tree) bins — roughly a 20-25 % reduction in per-element memory. The extra indirection and the static dummy object are also avoided.
 
-### 2. Upfront Capacity Pre-Allocation & Sizing (`constructor(Collection c)`, `addAll`)
-- **The JDK Bottleneck:** Constructing a JDK `HashSet` from an existing collection or repeatedly invoking `addAll` often
-  incurs multiple intermediate rehashing steps and dynamic table resizing as the internal map grows past default
-  thresholds.
+### 2. Pre-sizing on `addAll` / collection constructors
+`HashSet(Collection)` already pre-sizes, but `HashSet.addAll` does not.  
+`CustomSet` calculates the required capacity up-front with the same formula used by the JDK constructors (`tableSizeFor((int)(c.size() / loadFactor) + 1)`), eliminating intermediate resizes during bulk insertion.
 
-- **V3 Advantage:** V3 constructors and bulk insertion methods calculate exact initial capacities upfront using
-  `tableSizeFor` and load factor constraints (`(c.size() / DEFAULT_LOAD_FACTOR) + 1`). By sizing the backing array
-  precisely before inserting any elements, V3 completely eliminates mid-construction resizing overhead.
+### 3. Optimised bulk set operations on non-Set arguments
+Both `retainAll` and `removeAll` convert a plain `Collection`/`List` into a temporary `CustomSet` (or reuse the argument when it is already a `Set`). This turns an \(O(N\cdot M)\) nested scan into an \(O(N+M)\) pass.  
+Against large lists the measured speedup exceeds 500×. Against an argument that is already a set the conversion is skipped.
 
-### 3. Optimized Set Intersection Operations (`retainAll`)
-- **The JDK Bottleneck:** In standard JDK implementations, `retainAll(Collection)` iterates over the set and performs
-  repetitive, sequential containment checks against the target collection, resulting in a sluggish $O(N \cdot M)$
-  worst-case execution profile for non-set collections.
+### 4. Single-pass table walk for bulk removal
+`removeMatching` walks the hash table once and unlinks nodes in place. Combined with the conversion above, both bulk removal operations avoid the classic “iterator + repeated contains” pattern.
 
-- **V3 Advantage:** V3 optimizes non-set collections by converting them upfront into a temporary `CustomSet`
-  (`final Collection<?> retain = (c instanceof CustomSet) ? c : new CustomSet<Object>(c);`). This drops the algorithmic time
-  complexity from $O(N \cdot M)$ down to an $O(N + M)$ lookup blitz, yielding massive performance gains (exceeding
-  **501× speedups** in benchmark evaluations).
+### 5. Proven HashMap techniques (parity, not advantage)
+The following are intentional mirrors of modern OpenJDK `HashMap` and therefore deliver the same asymptotic behaviour:
 
-### 4. Zero-Allocation Iterator Traversal (`iterator`, `spliterator`)
-- **The JDK Bottleneck:** Iterators over standard collection wrappers frequently instantiate cursor tracking objects or
-  rely on generic map iterators that introduce garbage collection churn during large-scale sequential traversal.
+- Power-of-two table sizing and `(n-1) & hash` indexing
+- Secondary hash mixing `h ^ (h >>> 16)`
+- Treeification / untreeification of collision bins
+- Bitwise low/high split on table doubling
+- Fail-fast, late-binding, range-splitting spliterator
 
-- **V3 Advantage:** V3's custom `HashIterator` performs zero-allocation pointer traversals across standard singly-linked
-  collision chains, caching localized key snapshots only when stepping into complex Red-Black tree bins. This minimizes
-  object allocation churn and keeps iteration streams fast and efficient.
+They are listed for completeness, not as improvements over the JDK.
 
-### 5. Power-of-Two Bitwise Splitting in Resize Operations (`resize`, `transferBins`)
-- **The JDK Bottleneck:** General-purpose table resizing requires re-evaluating hash codes and recalculating bucket
-  indices for every stored element from scratch.
+### 6. Tree bins remain linked-list traversable
+Every `TreeNode` keeps the classic `next`/`previous` links. Consequently the iterator and spliterator never have to special-case tree structure except for a one-time key snapshot when a tree bin is first encountered. The common-case path stays simple and iteration order within a bin remains stable across treeification.
 
-- **V3 Advantage:** When doubling table capacity (`newCapacity == oldCapacity << 1`), V3 bypasses full re-indexing
-  arithmetic entirely, utilizing the bitwise check `(entry.hash & oldCapacity)` to partition collision chains cleanly into
-  low and high bins in-place without re-computing hash codes or allocating new wrapper nodes.
+### 7. Clean serialisation
+`size` and `threshold` are marked `transient`. `writeObject`/`readObject` therefore emit only the essential capacity, element count and the elements themselves, avoiding the redundant metadata that would otherwise be written by `defaultWriteObject`.
 
-### 6. Adaptive Removal Heuristic (`removeAll`)
-- **The JDK Bottleneck:** Standard JDK implementations of `removeAll(Collection)` blindly iterate over the entire
-  collection or set without regard to relative sizes, often leading to redundant scans when removing a small collection
-  from a massive set (or vice versa).
+### 8. Independent of HashMap
+The implementation does not wrap or depend on `java.util.HashMap`. This keeps the artefact smaller and allows the node layout or tree policy to evolve independently if required.
 
-- **V3 Advantage:** `CustomSet` dynamically evaluates set cardinalities (`if (size > c.size())`) to choose the optimal
-  removal strategy: either targeting individual collection elements directly for rapid deletion or running a single-pass
-  iterator scan. This adaptive branching ensures optimal time complexity regardless of relative collection sizes.
-
-### 7. Deterministic Hash-Bucket Null Handling (`hash`, `add`)
-- **The JDK Bottleneck:** Some set or map implementations require special conditional branches or dedicated sentinel wrappers to process `null` keys safely without throwing `NullPointerException`.
-
-- **V3 Advantage:** V3 evaluates `null` keys via a deterministic hash code of `0` (`(key == null) ? 0 : ...`), routing `null` values directly into bucket `0` alongside standard collision chains and Red-Black trees. This avoids redundant conditional branching overhead during standard lookups while maintaining full `null` compatibility.
-
-### 8. Adaptive Table Sizing & Bitwise Masking (`tableSizeFor`, `hash`)
-- **The JDK Bottleneck:** Inefficient table sizing calculations or modulo-based index arithmetic can lead to suboptimal
-  memory packing and expensive division CPU instructions during lookups.
-
-- **V3 Advantage:** V3 enforces exact power-of-two table capacities via bit-manipulation in `tableSizeFor`, enabling
-  table index lookups to execute via lightning-fast bitwise AND operations (`hash & (table.length - 1)`). Furthermore,
-  secondary bit-mixing (`h ^ (h >>> HASH_BITS_TO_SHIFT)`) spreads high bits into lower bits to minimize collisions even with poorly
-  implemented user key hash codes.
-
-### 9. Stream-Ready Parallel Spliterators (`spliterator`)
-- **The JDK Bottleneck:** Standard or poorly optimized set wrappers often provide naive spliterators that lack efficient
-  range splitting or proper structural safety checks during parallel stream processing.
-
-- **V3 Advantage:** V3 implements a specialized `CustomSetSpliterator` that supports fail-fast concurrency checks
-  (`ConcurrentModificationException`), late-binding table initialization, and binary tree/bucket range splitting
-  (`trySplit()`). This allows the set to integrate seamlessly into modern Java parallel streams and functional pipelines
-  with optimal work-stealing efficiency.
-
-### 10. Custom Packed Serialization (`writeObject`, `readObject`)
-- **The JDK Bottleneck:** Default Java serialization for complex collection wrappers often serializes redundant metadata
-  or incurs heavy reflection overhead, resulting in bloated byte streams and slow deserialization times.
-
-- **V3 Advantage:** V3 implements custom `writeObject` and `readObject` routines that pack only the essential capacity
-  and active mapping entries directly into the serialization stream, reconstructing the hash table and re-establishing
-  table thresholds efficiently upon deserialization without redundant object overhead.
-
-### 11. Pre-Sized StringBuilder Buffer Allocation (`toString`)
-- **The JDK Bottleneck:** Default collection `toString()` implementations often rely on dynamic string concatenation or
-  iterative buffer resizing as elements are appended, triggering continuous memory reallocation and array copying.
-
-- **V3 Advantage:** V3's `toString()` calculates an initial capacity heuristically
-  (`(int) Math.min(1 << 20, Math.max(16L, size * 8L))`) based on active set size before instantiating the `StringBuilder`.
-  This pre-allocation entirely eliminates buffer reallocation churn during string serialization.
+---
 
 ## Trade-Offs & Architectural Limitations
 
-While `CustomSetV3` delivers significant performance and memory improvements over the standard JDK implementation, these
-gains come with specific design trade-offs:
+### 1. Temporary allocation on bulk set operations
+Converting a non-set argument allocates an \(O(M)\) temporary set. The allocation is short-lived, but repeated calls on large collections increase young-gen GC pressure.  
+(The conversion is skipped when the argument is already a `Set`.)
 
-### 1. The `retainAll` Temporary Heap Allocation Trap
-- **The Bottleneck:** When calling `retainAll(Collection c)` where the incoming collection is not already a `Set`, V3
-  instantiates a temporary `CustomSet` on the heap
-  (`final Collection<?> retainValues = (c instanceof Set) ? c : new CustomSet<>(c);`).
+### 2. TreeNode memory cost under high collision
+A `TreeNode` carries parent/left/right/previous/colour pointers. Under adversarial or poorly-hashed workloads the per-entry footprint grows and the original memory advantage disappears. (The same trade-off exists in the JDK.)  
+In addition, the \(O(\log N)\) guarantee only fully holds for `Comparable` keys; non-Comparable keys still fall back to linear search inside a tree bin (exactly as in OpenJDK).
 
-- **The Trade-Off:** While this drops algorithmic time complexity from $O(N \cdot M)$ down to $O(N + M)$, it forces an
-  immediate $O(M)$ memory allocation and generates transient garbage collection (GC) pressure. Frequent calls to
-  `retainAll` on large non-set collections can thrash the
-  [Eden space (Oracle JVM Heap Architecture)](https://docs.oracle.com/cd/E19146-01/820-7979/ggkge/index.html).
+### 3. Iterator allocates on tree bins
+The “zero-allocation” claim holds only for ordinary collision chains. Hitting a tree bin forces an `Object[]` key snapshot. The JDK iterator never does this; it simply follows the `next` links.
 
-### 2. `TreeNode` Memory Bloat Under Adversarial Workloads
-- **The Bottleneck:** To protect against worst-case $O(N)$ hash-collision degradation, heavy collision bins
-  automatically treeify into Red-Black trees (`TreeNode`).
+### 4. Manual `clone()` surface
+`clone()` walks the table, rebuilds lists and re-treeifies bins by hand. Any future change to node linkage or balancing invariants must be mirrored here. Serialisation goes through the normal `add` path and therefore obtains treeification for free; `clone()` is the sole maintenance hotspot. Prefer a copy-constructor or the serialisation path if the manual implementation ever becomes painful.  
+Note that `clone()` copies the current table length; a sparsely-filled set therefore retains its capacity, whereas a pure serialise/deserialise round-trip would re-size from the element count.
 
-- **The Trade-Off:** A `TreeNode` carries significantly more memory overhead than a standard `Node` because it maintains
-  parent, left, right, previous, and color pointers. Under a malicious hash-flooding attack or high-collision workload,
-  per-entry memory footprints balloon, negating the memory-saving benefits of avoiding JDK's `HashMap.Node` wrapper.
+### 5. Fail-fast is best-effort only
+`modCount` provides the same best-effort concurrent-modification detection as the JDK collections. It is not a substitute for external synchronisation; concurrent mutation can still corrupt the structure before a `ConcurrentModificationException` is thrown.
 
-### 3. Maintenance Risk in Manual `clone()` Logic
-- **The Bottleneck:** The `clone()` method is implemented manually by walking the source table, bifurcating logic
-  between standard nodes and tree nodes, rebuilding linked lists via tail pointers, and explicitly re-invoking
-  `.treeify(dst)` on cloned tree bins.
-
-- **The Trade-Off:** This presents a long-term maintenance liability. Any future refactoring of node linkage rules,
-  parent pointers, or balancing invariants requires synchronized, manual updates inside `clone()`. Bypassing cleaner
-  factory or serialization cloning patterns leaves a potential vector for silent pointer corruption if an edge-case link
-  is missed.
-
-### 4. Reactive, Non-Thread-Safe Fail-Fast (`modCount`)
-- **The Bottleneck:** Like standard JDK collections, V3 relies on `modCount` to trigger a
-  `ConcurrentModificationException` when structural mutations occur during iteration.
-
-- **The Trade-Off:** This mechanism is strictly reactive rather than proactive or thread-safe. Without external
-  synchronization, concurrent multi-threaded access will corrupt non-atomic pointer updates (`size++`, table resizing)
-  long before a `ConcurrentModificationException` is thrown. Developers sharing sets across threads without external
-  locking will encounter silent data corruption rather than safe thread isolation.
-
-### 5. Reliance on Third-Party Set Contracts in `equals()`
-- **The Bottleneck:** The `equals(Object o)` implementation verifies size equality and delegates containment checking
-  via `containsAll(other)`.
-
-- **The Trade-Off:** The implementation blindly trusts the contract of any arbitrary third-party `Set` implementation
-  passed in. If `other` is a poorly written custom collection whose `size()` lies or whose `contains()` method introduces
-  side effects or non-deterministic behavior, the set's entire equality contract breaks down.
+### 6. Fixed load factor and capacity ceiling
+The load factor is final after construction (identical to `HashMap`). The table is hard-capped at \(2^{30}\) buckets, again matching the JDK limit.
 
 ## Related Versions
 

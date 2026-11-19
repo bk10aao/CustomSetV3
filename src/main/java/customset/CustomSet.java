@@ -45,7 +45,7 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    private int threshold;
+    private transient int threshold;
     private final float loadFactor;
     private static final int DEFAULT_INITIAL_CAPACITY = 16;
     private static final int HASH_BITS_TO_SHIFT = 16;
@@ -58,7 +58,7 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
     transient int modCount = 0;
     transient Node<E>[] table;
 
-    int size;
+    transient int size;
 
     /**
      * Constructs a new, empty set with an initial capacity of 16 and a default load factor of 0.75.

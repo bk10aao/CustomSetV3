@@ -198,7 +198,7 @@ public class CustomSetV3Benchmark {
 
     public static void main(String[] args) throws RunnerException {
         Options opt = new OptionsBuilder()
-                .include(CustomSetV3Benchmark.class.getSimpleName())
+                .include(CustomSetV3Benchmark2.class.getSimpleName())
                 .forks(1)
                 .result("custom-set-v3-results.csv")
                 .resultFormat(ResultFormatType.CSV)
