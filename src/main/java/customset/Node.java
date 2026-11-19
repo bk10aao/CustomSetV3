@@ -9,6 +9,7 @@ package customset;
  * @param <E> the type of element stored in this node
  */
 class Node<E> {
+
     final int hash;
     final E key;
     Node<E> next;

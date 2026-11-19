@@ -132,5 +132,9 @@ for spine in ax.spines.values():
     spine.set_edgecolor('#555555')
 
 plt.subplots_adjust(left=0.22, right=0.97, top=0.90, bottom=0.17)
+<<<<<<< HEAD
 plt.savefig('geometric.png', dpi=300, transparent=True, facecolor='none', edgecolor='none')
+=======
+plt.savefig('geometric_v3_v2.png', dpi=300, transparent=True, facecolor='none', edgecolor='none')
+>>>>>>> refactor
 plt.close()

@@ -3,7 +3,6 @@ package customset;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 
-import static customset.CustomSet.UNTREEIFY_THRESHOLD;
 import static customset.CustomSet.keysMatch;
 import static java.lang.System.identityHashCode;
 import static java.util.Objects.requireNonNullElse;
@@ -16,6 +15,7 @@ final class TreeNode<E> extends Node<E> {
     private TreeNode<E> parent;
     TreeNode<E> previous;
     private boolean isRed;
+    static final int UNTREEIFY_THRESHOLD = 6;
 
     /**
      * Constructs a new Red-Black tree node.

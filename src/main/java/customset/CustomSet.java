@@ -5,11 +5,14 @@ import java.io.InvalidObjectException;
 import java.io.ObjectInputStream;
 import java.io.Serial;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.Spliterator;
+import java.util.function.Predicate;
 
 import static java.lang.reflect.Array.newInstance;
 import static java.util.Arrays.fill;
@@ -39,25 +42,22 @@ import static java.util.Objects.requireNonNull;
  */
 public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
 
-    //TODO, check retainAll performance
     @Serial
     private static final long serialVersionUID = 1L;
 
-    transient boolean containsNull = false;
-    private int threshold;
+    private transient int threshold;
     private final float loadFactor;
     private static final int DEFAULT_INITIAL_CAPACITY = 16;
     private static final int HASH_BITS_TO_SHIFT = 16;
     private static final int MAXIMUM_CAPACITY = 1 << 30;
     private static final int MIN_TREEIFY_CAPACITY = 64;
-    static final int TREEIFY_THRESHOLD = 8;
-    static final int UNTREEIFY_THRESHOLD = 6;
+    private static final int TREEIFY_THRESHOLD = 8;
     private static final float DEFAULT_LOAD_FACTOR = 0.75f;
 
     transient int modCount = 0;
     transient Node<E>[] table;
 
-    int size;
+    transient int size;
 
     /**
      * Constructs a new, empty set with an initial capacity of 16 and a default load factor of 0.75.
@@ -117,8 +117,6 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
      * @return {@code true} if this set did not already contain the specified element
      */
     public boolean add(final E e) {
-        if (e == null)
-            return addNullElement();
         Node<E>[] tab = table;
         if (tab == null || tab.length == 0)
             tab = expand();
@@ -204,8 +202,6 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
      * @return {@code true} if this set contains the specified element
      */
     public boolean contains(final Object o) {
-        if (o == null)
-            return containsNull;
         Node<E>[] tab = table;
         if (tab == null || tab.length == 0)
             return false;
@@ -229,7 +225,6 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
      */
     public void clear() {
         Node<E>[] tab = table;
-        containsNull = false;
         if (tab != null && size > 0) {
             size = 0;
             fill(tab, null);
@@ -314,8 +309,6 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
      * @return {@code true} if this set contained the specified element
      */
     public boolean remove(final Object o) {
-        if (o == null)
-            return removeNullElement();
         Node<E>[] tab = table;
         if (tab == null || tab.length == 0)
             return false;
@@ -340,21 +333,14 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
         requireNonNull(c, "Collection must not be null.");
         if (c.isEmpty() || size == 0)
             return false;
-        boolean modified = false;
         if (size > c.size()) {
+            boolean modified = false;
             for (Object e : c)
                 if (remove(e))
                     modified = true;
-        } else {
-            Iterator<E> it = iterator();
-            while (it.hasNext()) {
-                if (c.contains(it.next())) {
-                    it.remove();
-                    modified = true;
-                }
-            }
+            return modified;
         }
-        return modified;
+        return removeMatching(e -> containsQuietly(c, e));
     }
 
     /**
@@ -368,17 +354,12 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
         requireNonNull(c, "Collection must not be null.");
         if (size == 0)
             return false;
-        final Collection<?> retainValues = (c instanceof Set) ? c : new CustomSet<>(c);
-        boolean modified = false;
-        Iterator<E> it = iterator();
-        while (it.hasNext()) {
-            E element = it.next();
-            if (!retainValues.contains(element)) {
-                it.remove();
-                modified = true;
-            }
+        if (c.isEmpty()) {
+            clear();
+            return true;
         }
-        return modified;
+        final Collection<?> retain = (c instanceof CustomSet) ? c : new CustomSet<Object>(c);
+        return removeMatching(e -> !containsQuietly(retain, e));
     }
 
     /**
@@ -413,8 +394,6 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
     public Object[] toArray() {
         Object[] arr = new Object[size];
         int index = 0;
-        if (containsNull)
-            arr[index++] = null;
         if (table != null && size > 0)
             for (Node<E> node : table)
                 while (node != null) {
@@ -438,8 +417,6 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
         requireNonNull(a, "Array must not be null.");
         T[] arr = a.length < size ? (T[]) newInstance(a.getClass().getComponentType(), size) : a;
         int index = 0;
-        if (containsNull)
-            arr[index++] = null;
         if (table != null && size > 0)
             for (Node<E> node : table)
                 while (node != null) {
@@ -465,10 +442,6 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
             return "[]";
         StringBuilder sb = new StringBuilder((int) Math.min(1 << 20, Math.max(16L, size * 8L))).append('[');
         boolean first = true;
-        if (containsNull) {
-            sb.append("null");
-            first = false;
-        }
         if (table != null)
             for (Node<E> node : table)
                 while (node != null) {
@@ -481,13 +454,12 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
         return sb.append("]").toString();
     }
 
-    private boolean addNullElement() {
-        if (containsNull)
+    private static boolean containsQuietly(final Collection<?> c, final Object o) {
+        try {
+            return c.contains(o);
+        } catch (NullPointerException | ClassCastException e) {
             return false;
-        containsNull = true;
-        size++;
-        modCount++;
-        return true;
+        }
     }
 
     private void ensureCapacity(final int additional) {
@@ -499,8 +471,7 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
     }
 
     static <E> boolean keysMatch(Object target, Node<E> node) {
-        E key = node.key;
-        return Objects.equals(key, target);
+        return Objects.equals(node.key, target);
     }
 
     @Serial
@@ -518,7 +489,6 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
         this.table = (Node<E>[]) new Node[capacity];
         setThreshold(capacity);
         this.size = 0;
-        this.containsNull = false;
         for (int i = 0; i < mappings; i++)
             add((E) s.readObject());
     }
@@ -536,7 +506,6 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
             }
             int mask = newCapacity - 1;
             boolean canTreeify = newCapacity >= MIN_TREEIFY_CAPACITY;
-            Node<E>[] tails = (Node<E>[]) new Node[newCapacity];
             for (int i = 0; i < oldCapacity; i++) {
                 Node<E> node = oldTable[i];
                 if (node == null)
@@ -548,13 +517,9 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
                     Node<E> entry = (node instanceof TreeNode)
                             ? new Node<>(node.hash, node.key, null)
                             : node;
-                    entry.next = null;
                     int index = entry.hash & mask;
-                    if (tails[index] == null)
-                        newTable[index] = entry;
-                    else
-                        tails[index].next = entry;
-                    tails[index] = entry;
+                    entry.next = newTable[index];
+                    newTable[index] = entry;
                     node = next;
                     count++;
                 }
@@ -626,6 +591,50 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
         return true;
     }
 
+    private boolean removeMatching(final Predicate<? super E> filter) {
+        Node<E>[] tab = table;
+        if (tab == null || size == 0)
+            return false;
+        int removed = 0;
+        List<E> treeKeys = null;
+        try {
+            for (int i = 0; i < tab.length; i++) {
+                Node<E> first = tab[i];
+                if (first == null)
+                    continue;
+                if (first instanceof TreeNode) {
+                    for (Node<E> n = first; n != null; n = n.next)
+                        if (filter.test(n.key)) {
+                            if (treeKeys == null)
+                                treeKeys = new ArrayList<>();
+                            treeKeys.add(n.key);
+                        }
+                    continue;
+                }
+                Node<E> previous = null;
+                for (Node<E> n = first; n != null; n = n.next) {
+                    if (filter.test(n.key)) {
+                        if (previous == null)
+                            tab[i] = n.next;
+                        else
+                            previous.next = n.next;
+                        removed++;
+                    } else
+                        previous = n;
+                }
+            }
+        } finally {
+            if (removed > 0) {
+                size -= removed;
+                modCount++;
+            }
+        }
+        if (treeKeys != null)
+            for (E key : treeKeys)
+                remove(key);
+        return removed > 0 || treeKeys != null;
+    }
+
     private void removeNode(final Node<E> previous, final int index, final Node<E> entry) {
         Node<E>[] tab = table;
         if (previous == null)
@@ -648,17 +657,6 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
             current = current.next;
         }
         return false;
-    }
-
-    private boolean removeNullElement() {
-        boolean modified = false;
-        if (containsNull) {
-            containsNull = false;
-            modified = true;
-            modCount++;
-            size--;
-        }
-        return modified;
     }
 
     private boolean removeTreeNode(Object o, TreeNode<E> first, int hash, Node<E>[] tab) {
@@ -758,9 +756,6 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
         s.defaultWriteObject();
         s.writeInt(table == null ? 0 : table.length);
         s.writeInt(size);
-        if (containsNull) {
-            s.writeObject(null);
-        }
         if (table != null && size > 0)
             for (Node<E> node : table)
                 while (node != null) {
@@ -768,4 +763,5 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
                     node = node.next;
                 }
     }
+
 }

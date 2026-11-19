@@ -17,14 +17,13 @@ import static java.util.Objects.requireNonNull;
 class CustomSetSpliterator<E> implements Spliterator<E> {
 
     private final CustomSet<E> set;
-    private final int expectedModCount;
+    private int expectedModCount;
 
     private Node<E> current;
     private Node<E>[] table;
     private long estimatedSize;
     private int fence;
     private int index;
-    private boolean includeNull;
     private boolean sized;
 
     /**
@@ -44,7 +43,6 @@ class CustomSetSpliterator<E> implements Spliterator<E> {
         this.fence = fence;
         this.estimatedSize = estimatedSize;
         this.expectedModCount = expectedModCount;
-        this.includeNull = isRoot && set.containsNull;
         this.table = set.table;
         this.sized = isRoot;
     }
@@ -80,14 +78,8 @@ class CustomSetSpliterator<E> implements Spliterator<E> {
      */
     public void forEachRemaining(final Consumer<? super E> action) {
         requireNonNull(action, "Action must not be null.");
-        checkForComodification();
-        if (includeNull) {
-            includeNull = false;
-            action.accept(null);
-            if (estimatedSize > 0)
-                estimatedSize--;
-        }
         int high = getFence();
+        checkForComodification();
         Node<E>[] tab = table;
         if (tab != null) {
             for (Node<E> node = current; node != null; node = node.next)
@@ -113,15 +105,8 @@ class CustomSetSpliterator<E> implements Spliterator<E> {
      */
     public boolean tryAdvance(final Consumer<? super E> action) {
         requireNonNull(action, "Action must not be null.");
-        checkForComodification();
         int higherIndex = getFence();
-        if (includeNull) {
-            includeNull = false;
-            action.accept(null);
-            if (estimatedSize > 0)
-                estimatedSize--;
-            return true;
-        }
+        checkForComodification();
         Node<E>[] tab = table;
         if (tab == null)
             return false;
@@ -165,6 +150,7 @@ class CustomSetSpliterator<E> implements Spliterator<E> {
     private int getFence() {
         int higherIndex;
         if ((higherIndex = fence) < 0) {
+            expectedModCount = set.modCount;
             table = set.table;
             estimatedSize = set.size;
             higherIndex = fence = (table == null) ? 0 : table.length;

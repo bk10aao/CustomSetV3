@@ -25,6 +25,7 @@ import static java.util.Arrays.asList;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -680,7 +681,11 @@ public class CustomSetTest {
     public void spliterator_isFailFast_onStructuralModification() {
         CustomSet<Integer> set = new CustomSet<>(List.of(1, 2, 3, 4, 5));
         Spliterator<Integer> spliterator = set.spliterator();
+
+        assertTrue(spliterator.tryAdvance(e -> {}));
+
         set.add(99);
+
         assertThrows(ConcurrentModificationException.class, () -> spliterator.tryAdvance(e -> {}));
     }
 
@@ -688,9 +693,26 @@ public class CustomSetTest {
     public void spliterator_isFailFast_onClear() {
         CustomSet<Integer> set = new CustomSet<>(List.of(1, 2, 3));
         Spliterator<Integer> spliterator = set.spliterator();
+
+        spliterator.estimateSize();
+
         set.clear();
-        assertThrows(ConcurrentModificationException.class,
-                () -> spliterator.forEachRemaining(e -> {}));
+
+        assertThrows(ConcurrentModificationException.class, () -> spliterator.forEachRemaining(e -> {}));
+    }
+
+    @Test
+    public void spliterator_isLateBinding_modificationBeforeFirstUseIsReflected() {
+        CustomSet<Integer> set = new CustomSet<>(List.of(1, 2, 3));
+        Spliterator<Integer> spliterator = set.spliterator();
+
+        set.add(99);
+
+        List<Integer> seen = new ArrayList<>();
+        spliterator.forEachRemaining(seen::add);
+
+        assertEquals(4, seen.size());
+        assertTrue(seen.contains(99));
     }
 
     @Test
@@ -794,13 +816,11 @@ public class CustomSetTest {
         assertEquals(12, set.size());
         for (int i = 0; i < 7; i++) {
             CollidingKey k = new CollidingKey(i);
-            System.out.println(k + " " + i);
             assertTrue(set.remove(k));
         }
         assertEquals(5, set.size());
         for (int i = 7; i < 12; i++) {
             CollidingKey k = new CollidingKey(i);
-            System.out.println(k + " " + i);
             assertTrue(set.contains(k));
         }
     }
@@ -993,12 +1013,131 @@ public class CustomSetTest {
             assertTrue(deserialized.contains(new CollidingKey(i)));
     }
 
-    private static CustomSet<Integer> createDynamicSet(int x) {
-        CustomSet<Integer> customSet = new CustomSet<>();
-        Random random = new Random();
-        for (int i = 0; i < x; i++)
-            customSet.add(random.nextInt());
-        return customSet;
+    @Test
+    public void nullIsStoredInBucketZeroAsNodeWithNullKeyAndHashZero() {
+        CustomSet<String> set = new CustomSet<>();
+
+        assertTrue(set.add(null));
+
+        Node<String> bucketZero = set.table[0];
+        assertNotNull(bucketZero, "bucket 0 should hold the null element");
+        assertNull(bucketZero.key);
+        assertEquals(0, bucketZero.hash);
+        assertNull(bucketZero.next);
+        assertEquals(1, set.size());
+    }
+
+    @Test
+    public void nullIsTheOnlyThingInTheTable() {
+        CustomSet<String> set = new CustomSet<>();
+        set.add(null);
+
+        for (int i = 1; i < set.table.length; i++)
+            assertNull(set.table[i], "bucket " + i + " should be empty");
+    }
+
+    @Test
+    public void duplicateNullIsRejectedAndDoesNotAddSecondNode() {
+        CustomSet<String> set = new CustomSet<>();
+        set.add(null);
+
+        assertFalse(set.add(null));
+        assertEquals(1, set.size());
+        assertNull(set.table[0].next, "no second node should be chained in bucket 0");
+    }
+
+    @Test
+    public void nullRemainsInBucketZeroAfterResize() {
+        CustomSet<Integer> set = new CustomSet<>(2);
+        set.add(null);
+        for (int i = 1; i <= 100; i++)
+            set.add(i);
+
+        assertTrue(set.table.length > 2, "table should have grown");
+        assertTrue(chainContainsNull(set.table[0]), "null should still be in bucket 0");
+        assertTrue(set.contains(null));
+        for (int i = 1; i < set.table.length; i++)
+            assertFalse(chainContainsNull(set.table[i]), "null must not appear in bucket " + i);
+    }
+
+    @Test
+    public void nullSharesBucketZeroWithOtherZeroHashElements() {
+        CustomSet<Object> set = new CustomSet<>();
+        Collider a = new Collider(1), b = new Collider(2);
+        set.add(a);
+        set.add(null);
+        set.add(b);
+
+        assertEquals(3, set.size());
+        assertTrue(chainContainsNull(set.table[0]));
+        assertTrue(set.contains(a));
+        assertTrue(set.contains(b));
+        assertTrue(set.contains(null));
+    }
+
+    @Test
+    public void nullInTreeifiedBucketZeroIsStillFoundAndRemovable() {
+        CustomSet<Object> set = new CustomSet<>(64);
+        set.add(null);
+        int TREEIFY_THRESHOLD = 8;
+        for (int i = 0; i < TREEIFY_THRESHOLD + 1; i++)
+            set.add(new Collider(i));
+
+        assertEquals(64, set.table.length, "table must not have been resized");
+        assertInstanceOf(TreeNode.class, set.table[0], "bucket 0 should have been treeified");
+        assertTrue(chainContainsNull(set.table[0]));
+        assertTrue(set.contains(null));
+
+        assertTrue(set.remove(null));
+        assertFalse(set.contains(null));
+        assertFalse(chainContainsNull(set.table[0]));
+        assertEquals(TREEIFY_THRESHOLD + 1, set.size());
+    }
+
+    @Test
+    public void removingNullEmptiesBucketZero() {
+        CustomSet<String> set = new CustomSet<>();
+        set.add(null);
+        assertTrue(set.remove(null));
+        assertNull(set.table[0]);
+        assertEquals(0, set.size());
+        assertFalse(set.remove(null));
+    }
+
+    @Test
+    public void clearRemovesNullFromBucketZero() {
+        CustomSet<String> set = new CustomSet<>();
+        set.add(null);
+        set.add("a");
+
+        set.clear();
+
+        assertNull(set.table[0]);
+        assertFalse(set.contains(null));
+        assertTrue(set.isEmpty());
+    }
+
+    private static boolean chainContainsNull(Node<?> head) {
+        for (Node<?> n = head; n != null; n = n.next)
+            if (n.key == null)
+                return true;
+        return false;
+    }
+
+    /**
+     * Distinct elements that all hash to 0, forcing them into bucket 0 alongside null.
+     */
+    private record Collider(int id) {
+
+        @Override
+        public int hashCode() {
+            return 0;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof Collider c && c.id == id;
+        }
     }
 
     private record CollidingKey(int id) implements Comparable<CollidingKey>, Serializable {
@@ -1021,5 +1160,13 @@ public class CustomSetTest {
         public int compareTo(CollidingKey o) {
             return Integer.compare(this.id, o.id);
         }
+    }
+
+    private static CustomSet<Integer> createDynamicSet(int x) {
+        CustomSet<Integer> customSet = new CustomSet<>();
+        Random random = new Random();
+        for (int i = 0; i < x; i++)
+            customSet.add(random.nextInt());
+        return customSet;
     }
 }
