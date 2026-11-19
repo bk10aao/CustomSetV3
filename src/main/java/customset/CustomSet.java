@@ -358,7 +358,7 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
             clear();
             return true;
         }
-        final Collection<?> retain = (c instanceof CustomSet) ? c : new CustomSet<Object>(c);
+        final Collection<?> retain = (c instanceof Set<?>) ? c : new CustomSet<>(c);
         return removeMatching(e -> !containsQuietly(retain, e));
     }
 
