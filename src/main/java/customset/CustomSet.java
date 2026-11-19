@@ -52,7 +52,6 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
     private static final int MAXIMUM_CAPACITY = 1 << 30;
     private static final int MIN_TREEIFY_CAPACITY = 64;
     private static final int TREEIFY_THRESHOLD = 8;
-    static final int UNTREEIFY_THRESHOLD = 6;
     private static final float DEFAULT_LOAD_FACTOR = 0.75f;
 
     transient int modCount = 0;
