@@ -5,8 +5,8 @@ from matplotlib.ticker import FuncFormatter
 from scipy.stats import gmean
 
 # 1. Load data for V1 and V3
-v1_df = pd.read_csv('CustomSetV1_performance.csv', sep=';')
-v3_df = pd.read_csv('CustomSetV3_performance.csv', sep=';')
+v1_df = pd.read_csv('../CustomSetV1_performance.csv', sep=';')
+v3_df = pd.read_csv('../CustomSetV3_performance.csv', sep=';')
 
 common_sizes = set(v1_df['Size']).intersection(set(v3_df['Size']))
 v1_df = v1_df[v1_df['Size'].isin(common_sizes)].sort_values('Size').reset_index(drop=True)
@@ -133,5 +133,5 @@ for spine in ax.spines.values():
     spine.set_edgecolor('#555555')
 
 plt.subplots_adjust(left=0.22, right=0.97, top=0.90, bottom=0.17)
-plt.savefig('geometric.png', dpi=300, transparent=True, facecolor='none', edgecolor='none')
+plt.savefig('geometric_v3_v1.png', dpi=300, transparent=True, facecolor='none', edgecolor='none')
 plt.close()
