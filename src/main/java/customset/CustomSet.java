@@ -430,7 +430,7 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
 
     /**
      * Returns a string representation of this set. The string representation consists of a list
-     * of the set's elements in the order they are returned by its iterator, enclosed in square
+     * of the set's elements in the order they are returned in the table, enclosed in square
      * brackets ({@code "[]"}). Adjacent elements are separated by the characters {@code ", "}
      * (comma and space).
      *
