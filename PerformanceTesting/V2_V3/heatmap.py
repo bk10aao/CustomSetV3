@@ -136,6 +136,6 @@ fig.text(
 )
 
 plt.tight_layout(rect=[0, 0.05, 1, 1])
-plt.savefig('heatmap.png', dpi=300, transparent=True)
+plt.savefig('heatmap_v2_v3_with_constructors.png', dpi=300, transparent=True)
 plt.close()
 print('V2 vs V3 Heatmap with constructors generated successfully!')

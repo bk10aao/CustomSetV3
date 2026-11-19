@@ -130,6 +130,6 @@ fig.text(
 )
 
 plt.tight_layout(rect=[0, 0.05, 1, 1])
-plt.savefig('heatmap.png', dpi=300, transparent=True)
+plt.savefig('heatmap_v3_v1_note_below.png', dpi=300, transparent=True)
 plt.close()
 print('Heatmap updated successfully!')
