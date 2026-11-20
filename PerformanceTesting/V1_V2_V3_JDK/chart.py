@@ -2,31 +2,34 @@
 """
 Generate performance benchmark charts as PNG files with transparent background.
 Compares V1, V2, V3, and JDK HashSet across all benchmarked operations.
-Saves PNG files into the local directory.
+Saves PNG files into the script's directory.
 """
 
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
-from matplotlib.lines import Line2D
 import csv
 import os
 import sys
+import matplotlib
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+from matplotlib.lines import Line2D
 import numpy as np
+
+matplotlib.use('Agg')
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Configuration
 # ──────────────────────────────────────────────────────────────────────────────
 
 FILES = {
-    'V1': 'CustomSetV1_performance.csv',
-    'V2': 'CustomSetV2_performance.csv',
-    'V3': 'CustomSetV3_performance.csv',
-    'JDK': 'HashSet_performance.csv',
+    'V1': os.path.join(BASE_DIR, 'CustomSetV1_performance.csv'),
+    'V2': os.path.join(BASE_DIR, 'CustomSetV2_performance.csv'),
+    'V3': os.path.join(BASE_DIR, 'CustomSetV3_performance.csv'),
+    'JDK': os.path.join(BASE_DIR, 'HashSet_performance.csv'),
 }
 
-OUTPUT_DIR = ""
+OUTPUT_DIR = BASE_DIR
 
 COLORS = {
     'V1': '#2ECFBF',       # Neon Teal
@@ -47,8 +50,8 @@ OPERATIONS = {
     'clone()': 'clone',
     'constructor()': 'constructor',
     'constructor(Collection)': 'constructorCollection',
-    'constructor(int)': 'constructorInt',
-    'constructor(int, double)': 'constructorIntDouble',
+    'constructor(int)': 'constructorCapacity',
+    'constructor(int, double)': 'constructorCapacityLoadFactor',
     'contains(Object)': 'contains',
     'containsAll(Collection)': 'containsAll',
     'equals(Object)': 'equals',
@@ -76,11 +79,17 @@ def load_csv(filepath):
     with open(filepath, 'r', encoding='utf-8') as f:
         reader = csv.DictReader(f, delimiter=';')
         for row in reader:
-            size = int(float(row['Size']))  # Safe against float-string representations (e.g., '1000.0')
-            data[size] = {
-                k: float(v) if v not in (None, '') else np.nan
-                for k, v in row.items() if k != 'Size'
-            }
+            raw_size = (row.get('Size') or '').strip()
+            if not raw_size:
+                continue
+            size = int(float(raw_size))
+            parsed = {}
+            for k, v in row.items():
+                if k is None or k == 'Size':
+                    continue
+                val = (v or '').strip()
+                parsed[k] = float(val) if val else np.nan
+            data[size] = parsed
     return data
 
 
@@ -112,7 +121,7 @@ def create_chart(operation_key, operation_label, datasets, canonical_sizes, outp
 
     for name, data in datasets.items():
         values = [
-            data[s][operation_key] if s in data and operation_key in data[s] else np.nan
+            data[s].get(operation_key, np.nan) if s in data else np.nan
             for s in canonical_sizes
         ]
         color = COLORS[name]
@@ -134,7 +143,6 @@ def create_chart(operation_key, operation_label, datasets, canonical_sizes, outp
             )
         )
 
-    # ── Grid & Formatting ─────────────────────────────────────────────────────
     ax.grid(True, color=COLORS['grid'], linewidth=0.8, linestyle='-', zorder=0)
     ax.set_axisbelow(True)
 
@@ -156,7 +164,6 @@ def create_chart(operation_key, operation_label, datasets, canonical_sizes, outp
     ax.set_ylabel('Time (ns)', color='white', fontsize=11, labelpad=10)
     ax.set_title(operation_key, color='white', fontsize=15, fontweight='bold', pad=14)
 
-    # ── Legend ────────────────────────────────────────────────────────────────
     leg = ax.legend(
         handles=legend_elements,
         loc='upper center',
@@ -184,6 +191,9 @@ def create_chart(operation_key, operation_label, datasets, canonical_sizes, outp
     )
     plt.close(fig)
 
+    if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
+        raise RuntimeError(f"Generated image at {output_path} is missing or 0 bytes.")
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Main
@@ -203,18 +213,16 @@ def main():
         canonical_sizes.update(data.keys())
         print(f"  Loaded {len(data)} sizes for {name}")
 
-    canonical_sizes = sorted(list(canonical_sizes))
+    canonical_sizes = sorted(canonical_sizes)
     print(f"Unified sizes for x-axis: {canonical_sizes}")
 
-    if OUTPUT_DIR and OUTPUT_DIR != ".":
-        os.makedirs(OUTPUT_DIR, exist_ok=True)
-    out_dir_str = OUTPUT_DIR if OUTPUT_DIR else "."
-    print(f"Generating comparison charts in '{out_dir_str}'...")
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    print(f"Generating comparison charts in '{OUTPUT_DIR}'...")
 
     for csv_col, chart_label in OPERATIONS.items():
-        output_path = os.path.join(OUTPUT_DIR, f'{chart_label}.png') if OUTPUT_DIR else f'{chart_label}.png'
+        output_path = os.path.join(OUTPUT_DIR, f'{chart_label}.png')
         create_chart(csv_col, chart_label, datasets, canonical_sizes, output_path)
-        print(f"  ✓ {chart_label}.png")
+        print(f"  ✓ {chart_label}.png ({os.path.getsize(output_path):,} bytes)")
 
     print("All charts generated successfully!")
 

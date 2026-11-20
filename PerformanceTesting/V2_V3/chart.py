@@ -1,29 +1,32 @@
 #!/usr/bin/env python3
 """
 Generate performance comparison charts between CustomSet V3 and CustomSet V2.
-Saves PNG files into the local directory "V3_V2".
+Saves PNG files into the script's directory.
 """
 
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
-from matplotlib.lines import Line2D
 import csv
 import os
 import sys
+import matplotlib
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+from matplotlib.lines import Line2D
 import numpy as np
+
+matplotlib.use('Agg')
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Configuration
 # ──────────────────────────────────────────────────────────────────────────────
 
 FILES = {
-    'V3': 'CustomSetV3_performance.csv',
-    'V2': 'CustomSetV2_performance.csv',
+    'V3': os.path.join(BASE_DIR, 'CustomSetV3_performance.csv'),
+    'V2': os.path.join(BASE_DIR, 'CustomSetV2_performance.csv'),
 }
 
-OUTPUT_DIR = ""
+OUTPUT_DIR = BASE_DIR
 
 COLORS = {
     'V3': '#FF5C5c',    # Neon Coral / Red for V3
@@ -71,11 +74,17 @@ def load_csv(filepath):
     with open(filepath, 'r', encoding='utf-8') as f:
         reader = csv.DictReader(f, delimiter=';')
         for row in reader:
-            size = int(float(row['Size']))
-            data[size] = {
-                k: float(v) if v not in (None, '') else np.nan
-                for k, v in row.items() if k != 'Size'
-            }
+            raw_size = (row.get('Size') or '').strip()
+            if not raw_size:
+                continue
+            size = int(float(raw_size))
+            parsed = {}
+            for k, v in row.items():
+                if k is None or k == 'Size':
+                    continue
+                val = (v or '').strip()
+                parsed[k] = float(val) if val else np.nan
+            data[size] = parsed
     return data
 
 
@@ -106,7 +115,7 @@ def create_chart(operation_key, operation_label, datasets, canonical_sizes, outp
     has_data = False
     for name, data in datasets.items():
         values = [
-            data[s][operation_key] if s in data and operation_key in data[s] else np.nan
+            data[s].get(operation_key, np.nan) if s in data else np.nan
             for s in canonical_sizes
         ]
 
@@ -184,6 +193,10 @@ def create_chart(operation_key, operation_label, datasets, canonical_sizes, outp
         edgecolor='none'
     )
     plt.close(fig)
+
+    if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
+        raise RuntimeError(f"Generated image at {output_path} is missing or 0 bytes.")
+
     return True
 
 
@@ -205,7 +218,7 @@ def main():
         canonical_sizes.update(data.keys())
         print(f"  Loaded {len(data)} sizes for {name}")
 
-    canonical_sizes = sorted(list(canonical_sizes))
+    canonical_sizes = sorted(canonical_sizes)
     print(f"\nUnified sizes for x-axis: {canonical_sizes}")
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -216,7 +229,7 @@ def main():
         output_path = os.path.join(OUTPUT_DIR, f'{chart_label}.png')
         success = create_chart(csv_col, chart_label, datasets, canonical_sizes, output_path)
         if success:
-            print(f"  ✓ {chart_label}.png")
+            print(f"  ✓ {chart_label}.png ({os.path.getsize(output_path):,} bytes)")
             generated_count += 1
         else:
             print(f"  - Skipped {chart_label}.png (column not present in CSV datasets)")

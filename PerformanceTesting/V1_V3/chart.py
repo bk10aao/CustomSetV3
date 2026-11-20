@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Generate performance comparison charts between CustomSet V1 and CustomSet V3.
-Saves PNG files into the local directory "V1_V3".
+Saves PNG files into the script's directory.
 """
 
 import csv
@@ -15,16 +15,18 @@ from matplotlib.lines import Line2D
 
 matplotlib.use("Agg")
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Configuration
 # ──────────────────────────────────────────────────────────────────────────────
 
 FILES = {
-    "V1": "CustomSetV1_performance.csv",
-    "V3": "CustomSetV3_performance.csv",
+    "V1": os.path.join(BASE_DIR, "CustomSetV1_performance.csv"),
+    "V3": os.path.join(BASE_DIR, "CustomSetV3_performance.csv"),
 }
 
-OUTPUT_DIR = "./V1_V3"
+OUTPUT_DIR = BASE_DIR
 
 COLORS = {
     "V1": "#2ECFBF",  # Neon Teal for V1
@@ -73,8 +75,17 @@ def load_csv(filepath):
   with open(filepath, "r", encoding="utf-8") as f:
     reader = csv.DictReader(f, delimiter=";")
     for row in reader:
-      size = int(float(row["Size"]))
-      data[size] = {k: float(v) for k, v in row.items() if k != "Size"}
+      raw_size = (row.get("Size") or "").strip()
+      if not raw_size:
+        continue
+      size = int(float(raw_size))
+      parsed = {}
+      for k, v in row.items():
+        if k is None or k == "Size":
+          continue
+        val = (v or "").strip()
+        parsed[k] = float(val) if val else np.nan
+      data[size] = parsed
   return data
 
 
@@ -106,9 +117,7 @@ def create_chart(
   has_data = False
   for name, data in datasets.items():
     values = [
-        data[s][operation_key]
-        if s in data and operation_key in data[s]
-        else np.nan
+        data[s].get(operation_key, np.nan) if s in data else np.nan
         for s in canonical_sizes
     ]
 
@@ -148,7 +157,6 @@ def create_chart(
     plt.close(fig)
     return False
 
-  # ── Grid & Formatting ─────────────────────────────────────────────────────
   ax.grid(True, color=COLORS["grid"], linewidth=0.8, linestyle="-", zorder=0)
   ax.set_axisbelow(True)
 
@@ -178,7 +186,6 @@ def create_chart(
       operation_key, color="white", fontsize=15, fontweight="bold", pad=14
   )
 
-  # ── Legend ────────────────────────────────────────────────────────────────
   leg = ax.legend(
       handles=legend_elements,
       loc="upper center",
@@ -205,6 +212,10 @@ def create_chart(
       edgecolor="none",
   )
   plt.close(fig)
+
+  if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
+    raise RuntimeError(f"Generated image at {output_path} is missing or 0 bytes.")
+
   return True
 
 
@@ -227,7 +238,7 @@ def main():
     canonical_sizes.update(data.keys())
     print(f"  Loaded {len(data)} sizes for {name}")
 
-  canonical_sizes = sorted(list(canonical_sizes))
+  canonical_sizes = sorted(canonical_sizes)
   print(f"\nUnified sizes for x-axis: {canonical_sizes}")
 
   os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -240,7 +251,7 @@ def main():
         csv_col, chart_label, datasets, canonical_sizes, output_path
     )
     if success:
-      print(f"  ✓ {chart_label}.png")
+      print(f"  ✓ {chart_label}.png ({os.path.getsize(output_path):,} bytes)")
       generated_count += 1
     else:
       print(
