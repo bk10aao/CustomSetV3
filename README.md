@@ -220,25 +220,25 @@ All methods implemented are identical to those found in the Java
 | **`add(E)`**                   | 494,851 ns |  1,952,206 ns  |            **V3**            |     3.95×     |
 | **`addAll(Collection)`**       | 343,238 ns |  2,048,502 ns  |            **V3**            |     5.97×     |
 | **`clear()`**                  | 154,275 ns |   495,582 ns   |            **V3**            |     3.21×     |
-| **`clone()`**                  | 271,763 ns |   496,985 ns   |            **V3**            |     1.83×      |
+| **`clone()`**                  | 271,763 ns |   496,985 ns   |            **V3**            |     1.83×     |
 | **`constructor()`**            |  1.51 ns   |    4.50 ns     |            **V3**            |     2.99×     |
 | **`constructor(Collection)`**  | 337,047 ns |   291,602 ns   |            **V1**            |     1.16×     |
 | **`constructor(int)`**         |  1.64 ns   |    2,446 ns    |            **V3**            | **1,488.90×** |
 | **`constructor(int, double)`** |  1.64 ns   |    2,445 ns    |            **V3**            | **1,493.47×** |
 | **`contains(Object)`**         |  3.79 ns   |    2.12 ns     |            **V1**            |     1.79×     |
-| **`containsAll(Collection)`**  | 19,229 ns  |    8,456 ns    |            **V1**            |     2.27×      |
+| **`containsAll(Collection)`**  | 19,229 ns  |    8,456 ns    |            **V1**            |     2.27×     |
 | **`equals(Object)`**           | 776,034 ns |  2,376,269 ns  |            **V3**            |     3.06×     |
-| **`hashCode()`**               | 78,284 ns  |   109,964 ns   |            **V3**            |     1.40×      |
+| **`hashCode()`**               | 78,284 ns  |   109,964 ns   |            **V3**            |     1.40×     |
 | **`isEmpty()`**                |  0.53 ns   |    0.54 ns     | **Statistically Equivalent** |    ~1.00×     |
-| **`iterator()`**               | 105,462 ns |   238,021 ns   |            **V3**            |     2.26×      |
-| **`remove(Object)`**           | 270,351 ns |   509,098 ns   |            **V3**            |     1.88×      |
-| **`removeAll(Collection)`**    | 307,264 ns |   549,852 ns   |            **V3**            |     1.79×      |
+| **`iterator()`**               | 105,462 ns |   238,021 ns   |            **V3**            |     2.26×     |
+| **`remove(Object)`**           | 270,351 ns |   509,098 ns   |            **V3**            |     1.88×     |
+| **`removeAll(Collection)`**    | 307,264 ns |   549,852 ns   |            **V3**            |     1.79×     |
 | **`retainAll(Collection)`**    | 362,631 ns | 183,425,778 ns |            **V3**            |  **505.82×**  |
 | **`size()`**                   |  0.53 ns   |    0.54 ns     | **Statistically Equivalent** |    ~1.00×     |
-| **`spliterator()`**            | 93,602 ns  |   125,419 ns   |            **V3**            |     1.34×      |
-| **`toArray()`**                | 99,550 ns  |   138,589 ns   |            **V3**            |     1.39×      |
-| **`toArray(T[])`**             | 109,326 ns |   145,863 ns   |            **V3**            |     1.33×      |
-| **`toString()`**               | 592,685 ns |   794,851 ns   |            **V3**            |     1.34×      |
+| **`spliterator()`**            | 93,602 ns  |   125,419 ns   |            **V3**            |     1.34×     |
+| **`toArray()`**                | 99,550 ns  |   138,589 ns   |            **V3**            |     1.39×     |
+| **`toArray(T[])`**             | 109,326 ns |   145,863 ns   |            **V3**            |     1.33×     |
+| **`toString()`**               | 592,685 ns |   794,851 ns   |            **V3**            |     1.34×     |
 
 ## Performance Testing
 
