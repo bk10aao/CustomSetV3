@@ -10,9 +10,11 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.ConcurrentModificationException;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
@@ -1047,54 +1049,6 @@ public class CustomSetTest {
     }
 
     @Test
-    public void nullRemainsInBucketZeroAfterResize() {
-        CustomSet<Integer> set = new CustomSet<>(2);
-        set.add(null);
-        for (int i = 1; i <= 100; i++)
-            set.add(i);
-
-        assertTrue(set.table.length > 2, "table should have grown");
-        assertTrue(chainContainsNull(set.table[0]), "null should still be in bucket 0");
-        assertTrue(set.contains(null));
-        for (int i = 1; i < set.table.length; i++)
-            assertFalse(chainContainsNull(set.table[i]), "null must not appear in bucket " + i);
-    }
-
-    @Test
-    public void nullSharesBucketZeroWithOtherZeroHashElements() {
-        CustomSet<Object> set = new CustomSet<>();
-        Collider a = new Collider(1), b = new Collider(2);
-        set.add(a);
-        set.add(null);
-        set.add(b);
-
-        assertEquals(3, set.size());
-        assertTrue(chainContainsNull(set.table[0]));
-        assertTrue(set.contains(a));
-        assertTrue(set.contains(b));
-        assertTrue(set.contains(null));
-    }
-
-    @Test
-    public void nullInTreeifiedBucketZeroIsStillFoundAndRemovable() {
-        CustomSet<Object> set = new CustomSet<>(64);
-        set.add(null);
-        int TREEIFY_THRESHOLD = 8;
-        for (int i = 0; i < TREEIFY_THRESHOLD + 1; i++)
-            set.add(new Collider(i));
-
-        assertEquals(64, set.table.length, "table must not have been resized");
-        assertInstanceOf(TreeNode.class, set.table[0], "bucket 0 should have been treeified");
-        assertTrue(chainContainsNull(set.table[0]));
-        assertTrue(set.contains(null));
-
-        assertTrue(set.remove(null));
-        assertFalse(set.contains(null));
-        assertFalse(chainContainsNull(set.table[0]));
-        assertEquals(TREEIFY_THRESHOLD + 1, set.size());
-    }
-
-    @Test
     public void removingNullEmptiesBucketZero() {
         CustomSet<String> set = new CustomSet<>();
         set.add(null);
@@ -1117,17 +1071,10 @@ public class CustomSetTest {
         assertTrue(set.isEmpty());
     }
 
-    private static boolean chainContainsNull(Node<?> head) {
-        for (Node<?> n = head; n != null; n = n.next)
-            if (n.key == null)
-                return true;
-        return false;
-    }
-
     /**
-     * Distinct elements that all hash to 0, forcing them into bucket 0 alongside null.
+     * Non-comparable elements that all hash to 0 (same bucket as null), forcing tie-break tree ordering.
      */
-    private record Collider(int id) {
+    private record Collider(int id) implements Serializable {
 
         @Override
         public int hashCode() {
@@ -1138,6 +1085,281 @@ public class CustomSetTest {
         public boolean equals(Object o) {
             return o instanceof Collider c && c.id == id;
         }
+
+        @Override
+        public String toString() {
+            return "C" + id;
+        }
+    }
+
+    /**
+     * Comparable elements that all hash to 0 (same bucket as null), exercising compareComparables tree paths.
+     */
+    private record ComparableCollider(int id) implements Comparable<ComparableCollider>, Serializable {
+
+        @Override
+        public int hashCode() {
+            return 0;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof ComparableCollider c && c.id == id;
+        }
+
+        @Override
+        public int compareTo(ComparableCollider o) {
+            return Integer.compare(this.id, o.id);
+        }
+
+        @Override
+        public String toString() {
+            return "CC" + id;
+        }
+    }
+
+    @Test
+    public void deterministicColliderRemovals_treeifiesAndUntreeifiesCleanly() {
+        for (int count = 7; count <= 40; count++) {
+            CustomSet<Object> set = new CustomSet<>(64);
+            Set<Object> ref = new HashSet<>();
+            set.add(null);
+            ref.add(null);
+            for (int i = 0; i < count; i++) {
+                Collider c = new Collider(i);
+                assertEquals(ref.add(c), set.add(c), "add(" + c + ") mismatch at count=" + count);
+            }
+            assertMatchesReference(set, ref, "build count=" + count);
+
+            List<Object> order = new ArrayList<>(ref);
+            Collections.shuffle(order, new Random(count));
+            for (Object o : order) {
+                boolean expectedRemoved = ref.remove(o);
+                boolean actualRemoved = set.remove(o);
+                assertEquals(expectedRemoved, actualRemoved,
+                        "remove(" + o + ") mismatch at count=" + count);
+                assertFalse(set.contains(o),
+                        "set still contains " + o + " after remove at count=" + count);
+                assertMatchesReference(set, ref, "after remove " + o + " count=" + count);
+            }
+        }
+    }
+
+    @Test
+    public void treeBoundaryThrashing_repeatedlyCrossesTreeifyAndUntreeifyThresholds() {
+        Random rnd = new Random(98765);
+        CustomSet<Object> set = new CustomSet<>(64);
+        Set<Object> ref = new HashSet<>();
+
+        for (int cycle = 0; cycle < 150; cycle++) {
+            for (int i = 0; i < 14; i++) {
+                Object key = switch (i % 3) {
+                    case 0 -> (i == 0) ? null : new Collider(rnd.nextInt(18));
+                    case 1 -> new ComparableCollider(rnd.nextInt(18));
+                    default -> new Collider(rnd.nextInt(18));
+                };
+                assertEquals(ref.add(key), set.add(key));
+                assertMatchesReference(set, ref, "thrash grow cycle=" + cycle + " step=" + i);
+            }
+            List<Object> snapshot = new ArrayList<>(ref);
+            Collections.shuffle(snapshot, rnd);
+            for (Object key : snapshot) {
+                if (ref.size() <= 4) {
+                    break;
+                }
+                assertEquals(ref.remove(key), set.remove(key));
+                assertMatchesReference(set, ref, "thrash shrink cycle=" + cycle);
+            }
+        }
+    }
+
+    @Test
+    public void randomDifferentialFuzz_matchesHashSetAcrossAllOperations() throws Exception {
+        Random rnd = new Random(12345);
+        for (int round = 0; round < 300; round++) {
+            CustomSet<Object> set = new CustomSet<>(rnd.nextBoolean() ? 16 : 64);
+            Set<Object> ref = new HashSet<>();
+            int ops = 400 + rnd.nextInt(600);
+
+            for (int i = 0; i < ops; i++) {
+                int op = rnd.nextInt(100);
+                Object key = nextKey(rnd);
+
+                if (op < 52) {
+                    assertEquals(ref.add(key), set.add(key),
+                            "add(" + key + ") mismatch at round=" + round + " op=" + i);
+                } else if (op < 80) {
+                    assertEquals(ref.remove(key), set.remove(key),
+                            "remove(" + key + ") mismatch at round=" + round + " op=" + i);
+                } else if (op < 85) {
+                    assertEquals(ref.contains(key), set.contains(key),
+                            "contains(" + key + ") mismatch at round=" + round + " op=" + i);
+                } else if (op < 88) {
+                    Iterator<Object> it = set.iterator();
+                    List<Object> victims = new ArrayList<>();
+                    while (it.hasNext()) {
+                        Object o = it.next();
+                        if (rnd.nextInt(4) == 0) {
+                            it.remove();
+                            victims.add(o);
+                        }
+                    }
+                    ref.removeAll(victims);
+                } else if (op < 91) {
+                    Collection<Object> batch = randomCollection(rnd, rnd.nextInt(30));
+                    assertEquals(ref.removeAll(batch), set.removeAll(batch),
+                            "removeAll mismatch at round=" + round + " op=" + i);
+                } else if (op < 94) {
+                    List<Object> candidates = new ArrayList<>(ref);
+                    Collections.shuffle(candidates, rnd);
+                    int keep = candidates.size() * 3 / 4;
+                    List<Object> sub = new ArrayList<>(candidates.subList(0, keep));
+                    if (rnd.nextBoolean()) {
+                        sub.add(new Collider(999));
+                    }
+                    Collection<Object> retainInput = rnd.nextBoolean() ? sub : new LinkedList<>(sub);
+                    assertEquals(ref.retainAll(retainInput), set.retainAll(retainInput),
+                            "retainAll mismatch at round=" + round + " op=" + i);
+                } else if (op < 96) {
+                    assertEquals(
+                            ref.removeIf(o -> o instanceof Integer v && v % 7 == 0),
+                            set.removeIf(o -> o instanceof Integer v && v % 7 == 0),
+                            "removeIf mismatch at round=" + round + " op=" + i);
+                } else if (op < 97) {
+                    CustomSet<Object> clone = set.clone();
+                    assertMatchesReference(clone, ref, "clone round=" + round);
+                    clone.clear();
+                    assertTrue(clone.isEmpty());
+                    assertMatchesReference(set, ref, "orig after clone.clear round=" + round);
+                } else if (op < 98 && i % 50 == 0) {
+                    CustomSet<Object> deserialized = roundTripSerialize(set);
+                    assertMatchesReference(deserialized, ref, "deserialize round=" + round);
+                } else if (op < 99) {
+                    Spliterator<Object> left = set.spliterator();
+                    Spliterator<Object> right = left.trySplit();
+                    Set<Object> traversed = new HashSet<>();
+                    if (right != null) {
+                        right.forEachRemaining(traversed::add);
+                    }
+                    left.forEachRemaining(traversed::add);
+                    assertEquals(ref, traversed, "spliterator mismatch at round=" + round);
+                } else {
+                    Collection<Object> batch = randomCollection(rnd, 80);
+                    assertEquals(ref.addAll(batch), set.addAll(batch),
+                            "addAll mismatch at round=" + round + " op=" + i);
+                }
+
+                assertMatchesReference(set, ref, "round=" + round + " op=" + i);
+            }
+        }
+    }
+
+    private static Object nextKey(Random rnd) {
+        int kind = rnd.nextInt(12);
+        if (kind == 0) {
+            return null;
+        }
+        if (kind < 5) {
+            return new Collider(rnd.nextInt(60));
+        }
+        if (kind < 8) {
+            return new ComparableCollider(rnd.nextInt(60));
+        }
+        return rnd.nextInt(200);
+    }
+
+    private static Collection<Object> randomCollection(Random rnd, int maxLen) {
+        Collection<Object> c = rnd.nextBoolean() ? new ArrayList<>() : new LinkedList<>();
+        for (int j = 0; j < maxLen; j++) {
+            c.add(nextKey(rnd));
+        }
+        return c;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> CustomSet<T> roundTripSerialize(CustomSet<T> set) throws Exception {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (ObjectOutputStream oos = new ObjectOutputStream(baos)) {
+            oos.writeObject(set);
+        }
+        try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(baos.toByteArray()))) {
+            return (CustomSet<T>) ois.readObject();
+        }
+    }
+
+    private static <T> void assertMatchesReference(CustomSet<T> actual, Set<T> expected, String ctx) {
+        assertEquals(expected.size(), actual.size(), ctx + ": size mismatch");
+        assertEquals(expected.isEmpty(), actual.isEmpty(), ctx + ": isEmpty mismatch");
+        assertEquals(expected, actual, ctx + ": expected.equals(actual) failed");
+        assertEquals(actual, expected, ctx + ": actual.equals(expected) failed");
+        assertEquals(expected.hashCode(), actual.hashCode(), ctx + ": hashCode mismatch");
+        assertEquals(expected.size(), actual.toArray().length, ctx + ": toArray().length mismatch");
+
+        Set<T> seen = new HashSet<>();
+        for (T element : actual) {
+            assertTrue(seen.add(element), ctx + ": iterator yielded duplicate element " + element);
+            assertTrue(expected.contains(element), ctx + ": iterator yielded unexpected element " + element);
+        }
+        assertEquals(expected.size(), seen.size(), ctx + ": iterator count mismatch");
+
+        for (T element : expected) {
+            assertTrue(actual.contains(element), ctx + ": missing expected element " + element);
+        }
+    }
+
+    @Test
+    public void nullSharesBucketZeroWithOtherZeroHashElements() {
+        CustomSet<Object> set = new CustomSet<>();
+        Collider a = new Collider(1), b = new Collider(2);
+        set.add(a);
+        set.add(null);
+        set.add(b);
+
+        assertEquals(3, set.size());
+        assertTrue(chainContainsNull(set.table[0]));
+        assertTrue(set.contains(a));
+        assertTrue(set.contains(b));
+        assertTrue(set.contains(null));
+    }
+
+    @Test
+    public void nullRemainsInBucketZeroAfterResize() {
+        CustomSet<Integer> set = new CustomSet<>(2);
+        set.add(null);
+        for (int i = 1; i <= 100; i++)
+            set.add(i);
+
+        assertTrue(set.table.length > 2, "table should have grown");
+        assertTrue(chainContainsNull(set.table[0]), "null should still be in bucket 0");
+        assertTrue(set.contains(null));
+        for (int i = 1; i < set.table.length; i++)
+            assertFalse(chainContainsNull(set.table[i]), "null must not appear in bucket " + i);
+    }
+
+    @Test
+    public void nullInTreeifiedBucketZeroIsStillFoundAndRemovable() {
+        CustomSet<Object> set = new CustomSet<>(64);
+        set.add(null);
+        int TREEIFY_THRESHOLD = 8;
+        for (int i = 0; i < TREEIFY_THRESHOLD + 1; i++)
+            set.add(new Collider(i));
+
+        assertEquals(64, set.table.length, "table must not have been resized");
+        assertInstanceOf(TreeNode.class, set.table[0], "bucket 0 should have been treeified");
+        assertTrue(chainContainsNull(set.table[0]));
+        assertTrue(set.contains(null));
+
+        assertTrue(set.remove(null));
+        assertFalse(set.contains(null));
+        assertFalse(chainContainsNull(set.table[0]));
+        assertEquals(TREEIFY_THRESHOLD + 1, set.size());
+    }
+
+    private static boolean chainContainsNull(Node<?> head) {
+        for (Node<?> n = head; n != null; n = n.next)
+            if (n.key == null)
+                return true;
+        return false;
     }
 
     private record CollidingKey(int id) implements Comparable<CollidingKey>, Serializable {

@@ -115,17 +115,11 @@ final class TreeNode<E> extends Node<E> {
         if (root.parent != null)
             root = root.root();
         int binCount = 0;
-        TreeNode<E> hd = root;
-        while (hd.previous != null)
-            hd = hd.previous;
-        for (TreeNode<E> node = hd; node != null; node = (TreeNode<E>) node.next)
+        for (Node<E> node = first; node != null; node = node.next)
             binCount++;
         TreeNode<E> rl;
         if (binCount <= UNTREEIFY_THRESHOLD || root.right == null || (rl = root.left) == null || rl.left == null) {
-            TreeNode<E> headNode = root;
-            while (headNode.previous != null)
-                headNode = headNode.previous;
-            tab[index] = headNode.untreeify();
+            tab[index] = first.untreeify();
             return;
         }
         TreeNode<E> nodeToDelete = this;

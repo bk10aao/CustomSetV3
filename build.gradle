@@ -20,7 +20,7 @@ dependencies {
 
 test {
     useJUnitPlatform()
-    finalizedBy jacocoTestReport // Ensures code coverage report runs automatically after tests
+    finalizedBy jacocoTestReport
 }
 
 jacoco {
@@ -38,7 +38,7 @@ jmh {
     includes = ['CustomSetV3Benchmark']
 
     fork = 3
-    warmupIterations = 5          // ← best practical value
+    warmupIterations = 5
     iterations = 10
     timeOnIteration = '1s'
     warmup = '1s'

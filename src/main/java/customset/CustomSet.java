@@ -25,7 +25,7 @@ import static java.util.Objects.requireNonNull;
  * <p>This implementation utilizes singly-linked list chaining for standard collision
  * resolution and automatically transitions collision bins into self-balancing Red-Black trees
  * ({@link TreeNode}) when bin occupancy exceeds {@link #TREEIFY_THRESHOLD}, mitigating
- * worst-case $O(N)$ lookup degradation to $O(\log N)$.
+ * worst-case {@code O(1)} lookup degradation to $O(\log N)$.
  *
  * <p>Unlike the standard JDK {@link java.util.HashSet} (which wraps elements inside intermediate
  * {@code HashMap.Node} objects), {@code CustomSet} optimizes memory layout and cache locality
@@ -49,6 +49,7 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
     private final float loadFactor;
     private static final int DEFAULT_INITIAL_CAPACITY = 16;
     private static final int HASH_BITS_TO_SHIFT = 16;
+    private static final int MAX_DESERIALIZATION_PRESIZE = 1 << 16;
     private static final int MAXIMUM_CAPACITY = 1 << 30;
     private static final int MIN_TREEIFY_CAPACITY = 64;
     private static final int TREEIFY_THRESHOLD = 8;
@@ -333,7 +334,7 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
         requireNonNull(c, "Collection must not be null.");
         if (c.isEmpty() || size == 0)
             return false;
-        if (size > c.size()) {
+        if (size > c.size() || !(c instanceof Set)) {
             boolean modified = false;
             for (Object e : c)
                 if (remove(e))
@@ -358,7 +359,7 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
             clear();
             return true;
         }
-        final Collection<?> retain = (c instanceof CustomSet) ? c : new CustomSet<Object>(c);
+        final Collection<?> retain = (c instanceof Set) ? c : new CustomSet<Object>(c);
         return removeMatching(e -> !containsQuietly(retain, e));
     }
 
@@ -471,7 +472,7 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
     }
 
     static <E> boolean keysMatch(Object target, Node<E> node) {
-        return Objects.equals(node.key, target);
+        return Objects.equals(target, node.key);
     }
 
     @Serial
@@ -485,7 +486,8 @@ public final class CustomSet<E> implements Set<E>, Cloneable, Serializable {
         int mappings = s.readInt();
         if (mappings < 0)
             throw new InvalidObjectException("Illegal mappings count: " + mappings);
-        int capacity = Math.max(tableSizeFor(cap), DEFAULT_INITIAL_CAPACITY);
+        long wanted = (long) (mappings / (double) loadFactor) + 1;
+        int capacity = Math.max(tableSizeFor((int) Math.min(wanted, MAX_DESERIALIZATION_PRESIZE)), DEFAULT_INITIAL_CAPACITY);
         this.table = (Node<E>[]) new Node[capacity];
         setThreshold(capacity);
         this.size = 0;
