@@ -157,6 +157,15 @@ All methods implemented are identical to those found in the Java
 
 ## Performance
 
+## Benchmark Environment
+
+Performance benchmarks were executed locally on:
+- **Machine:** MacBook Air (`Mac14,2`)
+- **Chip:** Apple M2 (8-core CPU: 4 Performance, 4 Efficiency)
+- **Memory:** 24 GB unified memory
+- **OS:** macOS
+- **Runtime:** JDK `21.0.1` (IntelliJ / run configuration; system CLI `java -version` reported OpenJDK `21.0.7`)
+
 ### V3 vs JDK HashSet
 
 | Method                         |     V3     |  JDK HashSet   |            Winner            | Speedup Margin |
@@ -239,17 +248,6 @@ All methods implemented are identical to those found in the Java
 | **`toArray()`**                | 99,550 ns  |   138,589 ns   |            **V3**            |     1.39×     |
 | **`toArray(T[])`**             | 109,326 ns |   145,863 ns   |            **V3**            |     1.33×     |
 | **`toString()`**               | 592,685 ns |   794,851 ns   |            **V3**            |     1.34×     |
-
-## Performance Testing
-
-## Benchmark Environment
-
-Performance benchmarks were executed locally on:
-- **Machine:** MacBook Air (`Mac14,2`)
-- **Chip:** Apple M2 (8-core CPU: 4 Performance, 4 Efficiency)
-- **Memory:** 24 GB unified memory
-- **OS:** macOS
-- **Runtime:** JDK `21.0.1` (IntelliJ / run configuration; system CLI `java -version` reported OpenJDK `21.0.7`)
 
 <b>Note: The following performance charts are designed to be viewed in dark mode.</b>
 
