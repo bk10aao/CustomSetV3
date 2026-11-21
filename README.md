@@ -16,7 +16,6 @@ overhead by 25%.
   - [V3 vs JDK HashSet](#v3-vs-jdk-hashset)
   - [V3 vs V2](#v3-vs-v2)
   - [V3 vs V1](#v3-vs-v1)
-- [Performance Testing](#performance-testing)
   - [Heat Maps](#heat-maps)
   - [Geometric Mean Comparisons](#geometric-mean-comparisons)
 - [Grouped Graphs](#grouped-graphs)
