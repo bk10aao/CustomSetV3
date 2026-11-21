@@ -50,7 +50,7 @@ Against large lists the measured speedup exceeds 500×. When the argument is alr
 ### 5. Proven HashMap techniques (parity, not advantage)
 The following are intentional mirrors of modern OpenJDK `HashMap` and therefore deliver the same asymptotic behaviour:
 
-- Power-of-two table sizing and `(n-1) & hash` indexing
+- Power-of-two table sizing and `(n - 1) & hash` indexing
 - Secondary hash mixing `h ^ (h >>> 16)`
 - Treeification / untreeification of collision bins
 - Bitwise low/high split on table doubling
