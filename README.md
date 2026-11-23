@@ -116,7 +116,7 @@ All methods implemented are identical to those found in the Java
 | **`isEmpty()`**                 |                                $O(1)$                                 |                                $O(1)$                                 | **Tie** |
 | **`iterator()`**                |   $O(1)$ (Avg Init) / $O(C)$ (Worst Init)<br>$O(N + C)$ (Traversal)   |   $O(1)$ (Avg Init) / $O(C)$ (Worst Init)<br>$O(N + C)$ (Traversal)   | **Tie** |
 | **`remove(Object o)`**          |                **$O(1)$** (Avg)<br>$O(\log N)$ (Worst)                |                **$O(1)$** (Avg)<br>$O(\log N)$ (Worst)                | **Tie** |
-| **`removeAll(Collection c)`**   |             $O(\min(M \log N, N \cdot \text{contains}))$              |             $O(\min(M \log N, N \cdot \text{contains}))$              | **Tie** |
+| **`removeAll(Collection c)`**   |              $O(min(M \log N, N \cdot \text{contains}))$              |              $O(min(M \log N, N \cdot \text{contains}))$              | **Tie** |
 | **`retainAll(Collection c)`**   | **$O(M + N)$** <br>*(Optimized via temporary `CustomSet` conversion)* | **$O(N \cdot M)$** <br>*(Iterative `contains` scans over collection)* | **V3**  |
 | **`size()`**                    |                                $O(1)$                                 |                                $O(1)$                                 | **Tie** |
 | **`toArray()`**                 |                              $O(N + C)$                               |                              $O(N + C)$                               | **Tie** |
