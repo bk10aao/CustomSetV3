@@ -125,29 +125,28 @@ All methods implemented are identical to those found in the Java
 
 ## Space Complexity
 
-| Operation                       |                           V3 Complexity                           |                         JDK Complexity                          | Winner  |
-|:--------------------------------|:-----------------------------------------------------------------:|:---------------------------------------------------------------:|:-------:|
-| **`constructor()`**             |                              $O(1)$                               |                             $O(1)$                              | **Tie** |
-| **`constructor(capacity)`**     |                   $O(1)$<br>*(Lazy allocation)*                   |                  $O(1)$<br>*(Lazy allocation)*                  | **Tie** |
-| **`constructor(Collection c)`** |               **$O(N + C)$**<br>*(Direct entries)*                | **$O(N + C + \text{Node})$**<br>*(Node & dummy value overhead)* | **V3**  |
-| **`add(E e)`**                  |                      $O(1)$<br>*(Amortized)*                      |                     $O(1)$<br>*(Amortized)*                     | **Tie** |
-| **`addAll(Collection c)`**      |                      $O(M + C_{\text{new}})$                      |                     $O(M + C_{\text{new}})$                     | **Tie** |
-| **`clone()`**                   |                  $O(N + C)$<br>*(Shallow copy)*                   |                 $O(N + C)$<br>*(Shallow copy)*                  | **Tie** |
-| **`contains(Object o)`**        |         $O(1)$ (Avg)<br>*$O(\log N)$ stack in tree bins*          |        $O(1)$ (Avg)<br>*$O(\log N)$ stack in tree bins*         | **Tie** |
-| **`clear()`**                   |                   $O(1)$<br>*(In-place reset)*                    |                  $O(1)$<br>*(In-place reset)*                   | **Tie** |
-| **`containsAll(Collection c)`** |                              $O(1)$                               |                             $O(1)$                              | **Tie** |
-| **`equals(Object o)`**          |                              $O(1)$                               |                             $O(1)$                              | **Tie** |
-| **`hashCode()`**                |                              $O(1)$                               |                             $O(1)$                              | **Tie** |
-| **`isEmpty()`**                 |                              $O(1)$                               |                             $O(1)$                              | **Tie** |
-| **`iterator()`**                |            $O(1)$<br>*(Plus $O(\text{bin})$ snapshot)*            |                             $O(1)$                              | **Tie** |
-| **`remove(Object o)`**          |         $O(1)$ (Avg)<br>*$O(\log N)$ stack in tree bins*          |        $O(1)$ (Avg)<br>*$O(\log N)$ stack in tree bins*         | **Tie** |
-| **`removeAll(Collection c)`**   |             $O(1)$<br>*(Plus $O(K)$ tree match list)*             |                             $O(1)$                              | **Tie** |
-| **`retainAll(Collection c)`**   | **$O(M)$**<br>*(Temporary set if c is not a Set; $O(1)$ for Set)* |                **$O(1)$**<br>*(Iterative scans)*                | **JDK** |
-| **`size()`**                    |                              $O(1)$                               |                             $O(1)$                              | **Tie** |
-| **`toArray()`**                 |                  $O(N)$<br>*(New array output)*                   |                 $O(N)$<br>*(New array output)*                  | **Tie** |
-| **`toArray(T[])`**              |               $O(N)$<br>*(New array if too small)*                |              $O(N)$<br>*(New array if too small)*               | **Tie** |
-| **`toString()`**                |                    $O(N)$<br>*(String buffer)*                    |                   $O(N)$<br>*(String buffer)*                   | **Tie** |
-
+| Operation                       |                            V3 Complexity                            |                        JDK Complexity                         | Winner  |
+|:--------------------------------|:-------------------------------------------------------------------:|:-------------------------------------------------------------:|:-------:|
+| **`constructor()`**             |                               $O(1)$                                |                            $O(1)$                             | **Tie** |
+| **`constructor(capacity)`**     |                     $O(1)$<br>(Lazy allocation)                     |                  $O(1)$<br>(Lazy allocation)                  | **Tie** |
+| **`constructor(Collection c)`** |                 **$O(N + C)$**<br>(Direct entries)                  | **$O(N + C + \text{Node})$**<br>(Node & dummy value overhead) | **V3**  |
+| **`add(E e)`**                  |                        $O(1)$<br>(Amortized)                        |                     $O(1)$<br>(Amortized)                     | **Tie** |
+| **`addAll(Collection c)`**      |                       $O(M + C_{\text{new}})$                       |                    $O(M + C_{\text{new}})$                    | **Tie** |
+| **`clone()`**                   |                    $O(N + C)$<br>(Shallow copy)                     |                 $O(N + C)$<br>(Shallow copy)                  | **Tie** |
+| **`contains(Object o)`**        |         **$O(1)$** (Avg)<br>$O(\log N)$ stack in tree bins          |      **$O(1)$** (Avg)<br>$O(\log N)$ stack in tree bins       | **Tie** |
+| **`clear()`**                   |                     $O(1)$<br>(In-place reset)                      |                  $O(1)$<br>(In-place reset)                   | **Tie** |
+| **`containsAll(Collection c)`** |                               $O(1)$                                |                            $O(1)$                             | **Tie** |
+| **`equals(Object o)`**          |                               $O(1)$                                |                            $O(1)$                             | **Tie** |
+| **`hashCode()`**                |                               $O(1)$                                |                            $O(1)$                             | **Tie** |
+| **`isEmpty()`**                 |                               $O(1)$                                |                            $O(1)$                             | **Tie** |
+| **`iterator()`**                |              $O(1)$<br>(Plus $O(\text{bin})$ snapshot)              |                            $O(1)$                             | **Tie** |
+| **`remove(Object o)`**          |         **$O(1)$** (Avg)<br>$O(\log N)$ stack in tree bins          |      **$O(1)$** (Avg)<br>$O(\log N)$ stack in tree bins       | **Tie** |
+| **`removeAll(Collection c)`**   |               $O(1)$<br>(Plus $O(K)$ tree match list)               |                            $O(1)$                             | **Tie** |
+| **`retainAll(Collection c)`**   | **$O(M)$** (non-Set) / $O(1)$ (Set)<br>(Temp set if c is not a Set) |                **$O(1)$**<br>(Iterative scans)                | **JDK** |
+| **`size()`**                    |                               $O(1)$                                |                            $O(1)$                             | **Tie** |
+| **`toArray()`**                 |                    $O(N)$<br>(New array output)                     |                 $O(N)$<br>(New array output)                  | **Tie** |
+| **`toArray(T[])`**              |                 $O(N)$<br>(New array if too small)                  |              $O(N)$<br>(New array if too small)               | **Tie** |
+| **`toString()`**                |                      $O(N)$<br>(String buffer)                      |                   $O(N)$<br>(String buffer)                   | **Tie** |
 ### Asymptotic Variables & Parameters
 
 - **$N$**: The number of elements currently stored in the set (i.e., `size()`).
